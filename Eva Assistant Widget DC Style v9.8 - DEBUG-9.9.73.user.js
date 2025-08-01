@@ -1,27 +1,12 @@
 // ==UserScript==
-// @name         Your Script Name
-// @namespace    http://your-domain.com/
-// @version      1.0.0
-// @description  Your script description
-// @author       Your Name
-// @match        https://example.com/*
-// @updateURL    https://your-server.com/path/to/script.user.js
-// @downloadURL  https://your-server.com/path/to/script.user.js
-// @grant        none
-// ==/UserScript==
-
-
-
-
-// ==UserScript==
-// @name         Eva Assistant Widget DC Style v9.8 - DEBUG
+// @name         Eva Assistant Widget DC Style v9.8
 // @namespace    http://tampermonkey.net/
-// @version      9.9.73
+// @version      9.8
 // @description  Eva widget - LIGHTNING FAST - WITH DEBUG - DOMAIN-SPECIFIC POSITION MEMORY
 // @author       You
 // @match        *://*/*
-// @updateURL    https://your-server.com/path/to/script.user.js
-// @downloadURL  https://your-server.com/path/to/script.user.js
+// @updateURL    https://github.com/charliefowle03/EvaAIassistant/blob/main/Eva%20Assistant%20Widget%20DC%20Style%20v9.8%20-%20DEBUG-9.9.73.user.js
+// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/blob/main/Eva%20Assistant%20Widget%20DC%20Style%20v9.8%20-%20DEBUG-9.9.73.user.j
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
