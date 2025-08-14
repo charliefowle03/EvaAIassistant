@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Eva Assistant Widget DC Style v9.8
+// @name         Eva Assistant Widget 
 // @namespace    http://tampermonkey.net/
-// @version      9.8
-// @description  Eva widget - LIGHTNING FAST - WITH DEBUG - DOMAIN-SPECIFIC POSITION MEMORY
+// @version      9.8.4
+// @description  Eva Widget
 // @author       You
 // @match        *://*/*
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/blob/main/Eva%20Assistant%20Widget%20DC%20Style%20v9.8%20-%20DEBUG-9.9.73.user.js
@@ -342,8 +342,34 @@
         return;
     }
 
-    // DOMAIN-SPECIFIC POSITION SAVING AND LOADING
+    // ZOOM-RESISTANT DIMENSIONS AND POSITIONING
     let evaWidget = null;
+
+    // Get current browser zoom level
+    const getZoomLevel = () => {
+        return window.devicePixelRatio || 1;
+    };
+
+    // Get zoom-resistant dimensions (7% bigger than the previous 19% increase)
+    const getZoomResistantDimensions = () => {
+        const zoom = getZoomLevel();
+
+        // Base dimensions: Previous size (169.575×32.13) increased by 7% = 181.45×34.38
+        const baseWidth = 181.45; // 169.575 * 1.07
+        const baseHeight = 34.38; // 32.13 * 1.07
+        const minWidth = 33.43; // 31.24 * 1.07
+
+        // Apply zoom compensation
+        const widgetWidth = baseWidth / zoom;
+        const widgetHeight = baseHeight / zoom;
+        const minWidgetWidth = minWidth / zoom;
+
+        return {
+            expanded: { width: widgetWidth, height: widgetHeight },
+            minimized: { width: minWidgetWidth, height: widgetHeight },
+            zoom: zoom
+        };
+    };
 
     // Create domain-specific storage keys
     const getDomainKey = (baseKey) => {
@@ -353,13 +379,16 @@
 
     const domainSpecificSavePos = (x, y) => {
         try {
+            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+
             const data = {
-                percentX: (x / window.innerWidth) * 100,
-                percentY: (y / window.innerHeight) * 100,
+                percentX: (x / vw) * 100,
+                percentY: (y / vh) * 100,
                 absoluteX: x,
                 absoluteY: y,
-                windowWidth: window.innerWidth,
-                windowHeight: window.innerHeight,
+                windowWidth: vw,
+                windowHeight: vh,
                 timestamp: Date.now(),
                 url: window.location.hostname
             };
@@ -395,13 +424,17 @@
                 console.log('🎯 Position loaded for domain:', window.location.hostname, 'from:', pos);
 
                 if (pos.percentX !== undefined && pos.percentY !== undefined) {
-                    // Use percentage-based positioning for better cross-page consistency
-                    let x = (pos.percentX * window.innerWidth) / 100;
-                    let y = (pos.percentY * window.innerHeight) / 100;
+                    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
 
-                    // Ensure widget stays on screen
-                    x = Math.max(10, Math.min(x, window.innerWidth - 200));
-                    y = Math.max(10, Math.min(y, window.innerHeight - 50));
+                    // Use percentage-based positioning for better cross-page consistency
+                    let x = (pos.percentX * vw) / 100;
+                    let y = (pos.percentY * vh) / 100;
+
+                    // Ensure widget stays on screen with zoom-resistant margins
+                    const margin = Math.min(vw * 0.01, 20); // 1% of viewport or 20px, whichever is smaller
+                    x = Math.max(margin, Math.min(x, vw - 200));
+                    y = Math.max(margin, Math.min(y, vh - 50));
 
                     console.log('🎯 Calculated position for domain:', window.location.hostname, ':', { x, y });
                     return { x, y };
@@ -413,8 +446,10 @@
             console.log('🎯 Domain-specific load failed:', e);
         }
 
-        // Default position
-        const defaultPos = { x: window.innerWidth * 0.01, y: window.innerHeight * 0.02 };
+        // Default position using viewport units
+        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+        const defaultPos = { x: vw * 0.01, y: vh * 0.02 };
         console.log('🎯 Using default position for domain:', window.location.hostname, ':', defaultPos);
         return defaultPos;
     };
@@ -461,8 +496,10 @@
         document.addEventListener('mousemove', (e) => {
             if (!dragging) return;
             e.preventDefault();
-            const newX = Math.max(0, Math.min(initX + e.clientX - startX, window.innerWidth - el.offsetWidth));
-            const newY = Math.max(0, Math.min(initY + e.clientY - startY, window.innerHeight - el.offsetHeight));
+            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+            const newX = Math.max(0, Math.min(initX + e.clientX - startX, vw - el.offsetWidth));
+            const newY = Math.max(0, Math.min(initY + e.clientY - startY, vh - el.offsetHeight));
             el.style.left = newX + 'px';
             el.style.top = newY + 'px';
         });
@@ -483,25 +520,98 @@
 
         const pos = domainSpecificLoadPos();
         const isMin = domainSpecificLoadMin();
+        const dimensions = getZoomResistantDimensions();
 
         console.log('🎯 Creating widget for domain:', window.location.hostname, 'at position:', pos, 'minimized:', isMin);
+        console.log('🎯 Widget dimensions:', dimensions);
+
+        const currentDim = isMin ? dimensions.minimized : dimensions.expanded;
+        const zoom = dimensions.zoom;
 
         const container = document.createElement('div');
         container.id = 'eva-search-box';
-        container.style.cssText = `position:fixed!important;left:${pos.x}px!important;top:${pos.y}px!important;background:#d8d5d4!important;border:2px solid #ff9900!important;border-radius:4px!important;padding:${isMin ? '4px 3px' : '4px 5px'}!important;z-index:2147483647!important;box-shadow:0 2px 6px rgba(0,0,0,0.2)!important;font-family:"Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif!important;cursor:move!important;font-size:14px!important;box-sizing:border-box!important;width:${isMin ? '35px' : '190px'}!important;height:36px!important;display:flex!important;align-items:center!important;justify-content:center!important;overflow:visible!important;pointer-events:auto!important;visibility:visible!important;opacity:1!important`;
+        container.style.cssText = `
+            position: fixed !important;
+            left: ${pos.x}px !important;
+            top: ${pos.y}px !important;
+            background: #d8d5d4 !important;
+            border: ${2/zoom}px solid #ff9900 !important;
+            border-radius: ${4/zoom}px !important;
+            padding: ${isMin ? (4/zoom) + 'px ' + (3/zoom) + 'px' : (4/zoom) + 'px ' + (5/zoom) + 'px'} !important;
+            z-index: 2147483647 !important;
+            box-shadow: 0 ${2/zoom}px ${6/zoom}px rgba(0,0,0,0.2) !important;
+            font-family: "Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif !important;
+            cursor: move !important;
+            font-size: ${14/zoom}px !important;
+            box-sizing: border-box !important;
+            width: ${currentDim.width}px !important;
+            height: ${currentDim.height}px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            overflow: visible !important;
+            pointer-events: auto !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: scale(1) !important;
+            transform-origin: top left !important;
+        `;
 
         const inputContainer = document.createElement('div');
-        inputContainer.style.cssText = `display:flex!important;align-items:center!important;justify-content:${isMin ? 'center' : 'space-between'}!important;gap:2px!important;height:32px!important;padding:0!important;width:100%!important`;
+        inputContainer.style.cssText = `
+            display: flex !important;
+            align-items: center !important;
+            justify-content: ${isMin ? 'center' : 'space-between'} !important;
+            gap: ${2/zoom}px !important;
+            height: ${(currentDim.height - 8/zoom)}px !important;
+            padding: 0 !important;
+            width: 100% !important;
+        `;
 
         const input = document.createElement('input');
         input.type = 'text';
         input.placeholder = 'Ask Eva...';
         input.id = 'eva-search-input';
-        input.style.cssText = `width:140px!important;height:22px!important;padding:0 6px!important;border:none!important;border-radius:3px!important;box-sizing:border-box!important;cursor:text!important;font-size:11px!important;font-family:"Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif!important;font-weight:400!important;line-height:20px!important;margin:0!important;color:#FFFFFF!important;vertical-align:middle!important;background-color:#232F3E!important;flex-grow:1!important;flex-shrink:1!important;display:${isMin ? 'none' : 'block'}!important;visibility:visible!important;opacity:1!important`;
+        input.style.cssText = `
+            width: ${(currentDim.width - 50/zoom)}px !important;
+            height: ${Math.max(22/zoom, currentDim.height * 0.6)}px !important;
+            padding: 0 ${6/zoom}px !important;
+            border: none !important;
+            border-radius: ${3/zoom}px !important;
+            box-sizing: border-box !important;
+            cursor: text !important;
+            font-size: ${Math.max(11/zoom, currentDim.height * 0.3)}px !important;
+            font-family: "Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif !important;
+            font-weight: 400 !important;
+            line-height: ${Math.max(20/zoom, currentDim.height * 0.55)}px !important;
+            margin: 0 !important;
+            color: #FFFFFF !important;
+            vertical-align: middle !important;
+            background-color: #232F3E !important;
+            flex-grow: 1 !important;
+            flex-shrink: 1 !important;
+            display: ${isMin ? 'none' : 'block'} !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            transform: scale(1) !important;
+        `;
 
         const attachBtn = document.createElement('div');
-        attachBtn.innerHTML = `<svg width="16px" height="16px" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19c-1.28 1.28-2.98 1.98-4.78 1.98s-3.5-.7-4.78-1.98c-2.64-2.64-2.64-6.92 0-9.56l9.19-9.19c.94-.94 2.2-1.46 3.54-1.46s2.6.52 3.54 1.46c1.95 1.95 1.95 5.12 0 7.07l-9.19 9.19c-.64.64-1.49 1-2.39 1s-1.75-.36-2.39-1c-1.32-1.32-1.32-3.46 0-4.78l8.48-8.48" fill="none" stroke="#565959" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-        attachBtn.style.cssText = `flex-shrink:0!important;cursor:pointer!important;padding:2px!important;border-radius:3px!important;transition:background-color 0.1s!important;display:flex!important;align-items:center!important;justify-content:center!important;width:20px!important;height:20px!important`;
+        const svgSize = Math.max(16/zoom, currentDim.height * 0.44);
+        attachBtn.innerHTML = `<svg width="${svgSize}px" height="${svgSize}px" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19c-1.28 1.28-2.98 1.98-4.78 1.98s-3.5-.7-4.78-1.98c-2.64-2.64-2.64-6.92 0-9.56l9.19-9.19c.94-.94 2.2-1.46 3.54-1.46s2.6.52 3.54 1.46c1.95 1.95 1.95 5.12 0 7.07l-9.19 9.19c-.64.64-1.49 1-2.39 1s-1.75-.36-2.39-1c-1.32-1.32-1.32-3.46 0-4.78l8.48-8.48" fill="none" stroke="#565959" stroke-width="${2/zoom}" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        attachBtn.style.cssText = `
+            flex-shrink: 0 !important;
+            cursor: pointer !important;
+            padding: ${2/zoom}px !important;
+            border-radius: ${3/zoom}px !important;
+            transition: background-color 0.1s !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            width: ${Math.max(20/zoom, currentDim.height * 0.55)}px !important;
+            height: ${Math.max(20/zoom, currentDim.height * 0.55)}px !important;
+            transform: scale(1) !important;
+        `;
         attachBtn.title = 'Attach file to Eva';
         attachBtn.onmouseenter = () => attachBtn.style.backgroundColor = '#f0f0f0';
         attachBtn.onmouseleave = () => attachBtn.style.backgroundColor = 'transparent';
@@ -511,7 +621,28 @@
             btn.innerHTML = arrow;
             btn.className = 'eva-minimize-button';
             btn.title = 'Click to minimize/maximize';
-            btn.style.cssText = `position:absolute!important;${side}:-10px!important;top:50%!important;transform:translateY(-50%)!important;display:flex!important;align-items:center!important;justify-content:center!important;width:10px!important;height:20px!important;background-color:#ff9900!important;color:#232F3E!important;font-size:7px!important;font-weight:bold!important;cursor:pointer!important;border-radius:${side === 'left' ? '3px 0 0 3px' : '0 3px 3px 0'}!important;border:1px solid #e6890a!important;user-select:none!important;font-family:"Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif!important;transition:background-color 0.1s!important;z-index:1000001!important`;
+            btn.style.cssText = `
+                position: absolute !important;
+                ${side}: ${-10/zoom}px !important;
+                top: 50% !important;
+                transform: translateY(-50%) scale(1) !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: ${10/zoom}px !important;
+                height: ${Math.max(20/zoom, currentDim.height * 0.55)}px !important;
+                background-color: #ff9900 !important;
+                color: #232F3E !important;
+                font-size: ${Math.max(7/zoom, currentDim.height * 0.19)}px !important;
+                font-weight: bold !important;
+                cursor: pointer !important;
+                border-radius: ${side === 'left' ? (3/zoom) + 'px 0 0 ' + (3/zoom) + 'px' : '0 ' + (3/zoom) + 'px ' + (3/zoom) + 'px 0'} !important;
+                border: ${1/zoom}px solid #e6890a !important;
+                user-select: none !important;
+                font-family: "Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif !important;
+                transition: background-color 0.1s !important;
+                z-index: 1000001 !important;
+            `;
             btn.onmouseenter = () => btn.style.backgroundColor = '#e6890a';
             btn.onmouseleave = () => btn.style.backgroundColor = '#ff9900';
             return btn;
@@ -527,9 +658,13 @@
                 if (clickCount === 1) {
                     setTimeout(() => clickCount = 0, 300);
                 } else if (clickCount === 2) {
-                    container.style.left = '20px';
-                    container.style.top = '20px';
-                    domainSpecificSavePos(20, 20);
+                    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+                    const resetX = Math.max(20, vw * 0.01);
+                    const resetY = Math.max(20, vh * 0.02);
+                    container.style.left = resetX + 'px';
+                    container.style.top = resetY + 'px';
+                    domainSpecificSavePos(resetX, resetY);
                     clickCount = 0;
                 }
             };
@@ -539,11 +674,14 @@
         const fastToggleMin = () => {
             const currentMin = input.style.display === 'none';
             const newMin = !currentMin;
+            const newDimensions = getZoomResistantDimensions();
+            const newDim = newMin ? newDimensions.minimized : newDimensions.expanded;
+            const newZoom = newDimensions.zoom;
 
             if (newMin) {
                 input.style.display = 'none';
-                container.style.width = '35px';
-                container.style.padding = '4px 3px';
+                container.style.width = newDim.width + 'px';
+                container.style.padding = (4/newZoom) + 'px ' + (3/newZoom) + 'px';
                 inputContainer.style.justifyContent = 'center';
                 leftBtn.innerHTML = '◀';
                 rightBtn.innerHTML = '▶';
@@ -552,8 +690,9 @@
                 container.classList.add('eva-minimized-pulse');
             } else {
                 input.style.display = 'block';
-                container.style.width = '190px';
-                container.style.padding = '4px 5px';
+                input.style.width = (newDim.width - 50/newZoom) + 'px';
+                container.style.width = newDim.width + 'px';
+                container.style.padding = (4/newZoom) + 'px ' + (5/newZoom) + 'px';
                 inputContainer.style.justifyContent = 'space-between';
                 leftBtn.innerHTML = '▶';
                 rightBtn.innerHTML = '◀';
@@ -561,10 +700,13 @@
                 // Remove pulsing glow when expanded
                 container.classList.remove('eva-minimized-pulse');
 
+                // Ensure widget stays on screen after expansion
+                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
                 const rect = container.getBoundingClientRect();
-                if (rect.right > window.innerWidth) container.style.left = (window.innerWidth - 200) + 'px';
+                if (rect.right > vw) container.style.left = (vw - newDim.width - 10) + 'px';
                 if (rect.left < 0) container.style.left = '10px';
-                if (rect.bottom > window.innerHeight) container.style.top = (window.innerHeight - 46) + 'px';
+                if (rect.bottom > vh) container.style.top = (vh - newDim.height - 10) + 'px';
                 if (rect.top < 0) container.style.top = '10px';
 
                 domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
@@ -594,26 +736,36 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.shiftKey && e.key === 'E') {
-                container.style.left = '20px';
-                container.style.top = '20px';
-                domainSpecificSavePos(20, 20);
+                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+                const resetX = Math.max(20, vw * 0.01);
+                const resetY = Math.max(20, vh * 0.02);
+                container.style.left = resetX + 'px';
+                container.style.top = resetY + 'px';
+                domainSpecificSavePos(resetX, resetY);
             }
         });
 
-        // Add CSS styles including the pulsing glow animation
+        // Add CSS styles including the pulsing glow animation with zoom resistance
         GM_addStyle(`
             #eva-search-input::placeholder{color:#AAB7B8!important;opacity:1!important}
-            #eva-search-input:focus{outline:none!important;box-shadow:0 0 0 1px rgba(255,153,0,0.2)!important}
+            #eva-search-input:focus{outline:none!important;box-shadow:0 0 0 ${1/zoom}px rgba(255,153,0,0.2)!important}
 
-            /* Minimized widget pulsing glow animation */
+            /* Zoom-resistant widget styles */
+            #eva-search-box * {
+                transform: scale(1) !important;
+                transform-origin: top left !important;
+            }
+
+            /* Minimized widget pulsing glow animation with zoom compensation */
             @keyframes minimizedPulse {
                 0%, 100% {
                     border-color: #ff9900 !important;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.2), 0 0 0 0 rgba(255, 153, 0, 0.4) !important;
+                    box-shadow: 0 ${2/zoom}px ${6/zoom}px rgba(0,0,0,0.2), 0 0 0 0 rgba(255, 153, 0, 0.4) !important;
                 }
                 50% {
                     border-color: #ffb84d !important;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.2), 0 0 0 4px rgba(255, 153, 0, 0.6) !important;
+                    box-shadow: 0 ${2/zoom}px ${6/zoom}px rgba(0,0,0,0.2), 0 0 0 ${4/zoom}px rgba(255, 153, 0, 0.6) !important;
                 }
             }
 
@@ -636,6 +788,103 @@
         fastDraggable(container, ['input', 'svg', '.eva-minimize-button']);
         fastEscape();
 
+        // Handle window resize and zoom changes to maintain consistent dimensions
+        const handleResize = () => {
+            setTimeout(() => {
+                const newDimensions = getZoomResistantDimensions();
+                const currentMin = input.style.display === 'none';
+                const newDim = currentMin ? newDimensions.minimized : newDimensions.expanded;
+                const newZoom = newDimensions.zoom;
+
+                // Update container dimensions and styles
+                container.style.width = newDim.width + 'px';
+                container.style.height = newDim.height + 'px';
+                container.style.border = (2/newZoom) + 'px solid #ff9900';
+                container.style.borderRadius = (4/newZoom) + 'px';
+                container.style.fontSize = (14/newZoom) + 'px';
+                container.style.padding = currentMin ?
+                    (4/newZoom) + 'px ' + (3/newZoom) + 'px' :
+                    (4/newZoom) + 'px ' + (5/newZoom) + 'px';
+
+                // Update input container
+                inputContainer.style.gap = (2/newZoom) + 'px';
+                inputContainer.style.height = (newDim.height - 8/newZoom) + 'px';
+
+                if (!currentMin) {
+                    // Update input field
+                    input.style.width = (newDim.width - 50/newZoom) + 'px';
+                    input.style.height = Math.max(22/newZoom, newDim.height * 0.6) + 'px';
+                    input.style.padding = '0 ' + (6/newZoom) + 'px';
+                    input.style.borderRadius = (3/newZoom) + 'px';
+                    input.style.fontSize = Math.max(11/newZoom, newDim.height * 0.3) + 'px';
+                    input.style.lineHeight = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
+                }
+
+                // Update attachment button
+                const newSvgSize = Math.max(16/newZoom, newDim.height * 0.44);
+                const svg = attachBtn.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('width', newSvgSize + 'px');
+                    svg.setAttribute('height', newSvgSize + 'px');
+                    svg.querySelector('path').setAttribute('stroke-width', (2/newZoom).toString());
+                }
+                attachBtn.style.width = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
+                attachBtn.style.height = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
+                attachBtn.style.padding = (2/newZoom) + 'px';
+                attachBtn.style.borderRadius = (3/newZoom) + 'px';
+
+                // Update minimize buttons
+                [leftBtn, rightBtn].forEach((btn, index) => {
+                    const side = index === 0 ? 'left' : 'right';
+                    btn.style[side] = (-10/newZoom) + 'px';
+                    btn.style.width = (10/newZoom) + 'px';
+                    btn.style.height = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
+                    btn.style.fontSize = Math.max(7/newZoom, newDim.height * 0.19) + 'px';
+                    btn.style.border = (1/newZoom) + 'px solid #e6890a';
+                    btn.style.borderRadius = side === 'left' ?
+                        (3/newZoom) + 'px 0 0 ' + (3/newZoom) + 'px' :
+                        '0 ' + (3/newZoom) + 'px ' + (3/newZoom) + 'px 0';
+                });
+
+                // Update CSS animations
+                const style = document.querySelector('style[data-eva-zoom-styles]');
+                if (style) style.remove();
+
+                const newStyle = document.createElement('style');
+                newStyle.setAttribute('data-eva-zoom-styles', 'true');
+                newStyle.textContent = `
+                    #eva-search-input:focus{outline:none!important;box-shadow:0 0 0 ${1/newZoom}px rgba(255,153,0,0.2)!important}
+                    @keyframes minimizedPulse {
+                        0%, 100% {
+                            border-color: #ff9900 !important;
+                            box-shadow: 0 ${2/newZoom}px ${6/newZoom}px rgba(0,0,0,0.2), 0 0 0 0 rgba(255, 153, 0, 0.4) !important;
+                        }
+                        50% {
+                            border-color: #ffb84d !important;
+                            box-shadow: 0 ${2/newZoom}px ${6/newZoom}px rgba(0,0,0,0.2), 0 0 0 ${4/newZoom}px rgba(255, 153, 0, 0.6) !important;
+                        }
+                    }
+                `;
+                document.head.appendChild(newStyle);
+
+                domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
+                console.log('🎯 Widget resized for domain:', window.location.hostname, 'zoom:', newZoom);
+            }, 100);
+        };
+
+        window.addEventListener('resize', handleResize);
+
+        // Also listen for zoom changes (devicePixelRatio changes)
+        let currentZoom = getZoomLevel();
+        setInterval(() => {
+            const newZoom = getZoomLevel();
+            if (Math.abs(newZoom - currentZoom) > 0.1) {
+                currentZoom = newZoom;
+                console.log('🎯 Zoom change detected:', newZoom);
+                handleResize();
+            }
+        }, 500);
+
         // DOMAIN-SPECIFIC POSITION SAVING - Multiple triggers
         window.addEventListener('beforeunload', () => {
             domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
@@ -651,14 +900,6 @@
         setInterval(() => {
             domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
         }, 2000); // Every 2 seconds
-
-        // Save position when window is resized
-        window.addEventListener('resize', () => {
-            setTimeout(() => {
-                domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
-                console.log('🎯 Position saved on window resize for domain:', window.location.hostname);
-            }, 100);
-        });
 
         return container;
     };
