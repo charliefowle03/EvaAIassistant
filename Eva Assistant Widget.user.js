@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Eva Assistant Widget with Global Themes
+// @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
 // @version      9.9.1
 // @description  Eva Widget with Global Theme Selection
