@@ -111,7 +111,7 @@
             GM_setValue('evaWidgetGlobalThemeBackup', themeName);
             GM_setValue('evaWidgetThemeTimestamp', Date.now());
             console.log('🎯 Global theme saved:', themeName);
-            
+
             // Broadcast theme change to other tabs/windows
             broadcastThemeChange(themeName);
         } catch (e) {
@@ -122,7 +122,7 @@
     const loadGlobalTheme = () => {
         try {
             // Load from global keys
-            const savedTheme = GM_getValue('evaWidgetGlobalTheme', 'default') || 
+            const savedTheme = GM_getValue('evaWidgetGlobalTheme', 'default') ||
                               GM_getValue('evaWidgetGlobalThemeBackup', 'default');
             console.log('🎯 Global theme loaded:', savedTheme);
             return savedTheme;
@@ -150,13 +150,13 @@
     // Listen for theme changes from other tabs
     const listenForThemeChanges = (applyThemeCallback) => {
         let lastBroadcastTimestamp = 0;
-        
+
         const checkForThemeUpdates = () => {
             try {
                 const broadcastData = GM_getValue('evaWidgetThemeBroadcast', '');
                 if (broadcastData) {
                     const data = JSON.parse(broadcastData);
-                    
+
                     // Only apply if this is a new broadcast and not from this window
                     if (data.timestamp > lastBroadcastTimestamp && data.source !== window.location.href) {
                         lastBroadcastTimestamp = data.timestamp;
@@ -750,7 +750,7 @@
                 applyThemeCallback(themeKey);
                 menu.remove();
                 console.log('🎯 Global theme changed to:', theme.name);
-                
+
                 // Show confirmation
                 showThemeChangeNotification(theme.name);
             };
@@ -991,19 +991,19 @@
         // Apply theme function
         const applyTheme = (themeName) => {
             const theme = themes[themeName] || themes.default;
-            
+
             // Update container
             container.style.background = theme.background;
             container.style.borderColor = theme.border;
-            
+
             // Update input
             input.style.backgroundColor = theme.inputBg;
             input.style.color = theme.inputText;
-            
+
             // Update attachment icon
             const svg = attachBtn.querySelector('svg path');
             if (svg) svg.setAttribute('stroke', theme.iconColor);
-            
+
             // Update minimize buttons
             [leftBtn, rightBtn].forEach(btn => {
                 btn.style.backgroundColor = theme.buttonBg;
@@ -1015,7 +1015,7 @@
 
             // Update CSS styles
             updateThemeStyles(theme, zoom);
-            
+
             console.log('🎯 Global theme applied:', theme.name);
         };
 
