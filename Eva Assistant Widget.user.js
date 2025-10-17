@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      9.9.2
+// @version      9.9.3
 // @description  Eva Widget with Global Theme Selection
 // @author       You
 // @match        *://*/*
