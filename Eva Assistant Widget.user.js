@@ -5,6 +5,8 @@
 // @description  Eva Widget with Global Theme Selection
 // @author       You
 // @match        *://*/*
+// @updateURL    https://github.com/charliefowle03/EvaAIassistant/blob/34d92ec45d11a1234f389543e31cac3c39207210/Eva%20Assistant%20Widget.user.js
+// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/blob/34d92ec45d11a1234f389543e31cac3c39207210/Eva%20Assistant%20Widget.user.js
 // @grant        GM_addStyle
 // @run-at       document-end
 // ==/UserScript==
