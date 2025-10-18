@@ -7,8 +7,8 @@
 // @match        *://*/*
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Chrome%20Version%20-%20Eva%20Assistant%20Widget%20.user.js
 // @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Chrome%20Version%20-%20Eva%20Assistant%20Widget%20.user.js
-// @supportURL   https://github.com/charliefowle03/EvaAIassistant-Chrome-Version
-// @homepageURL  https://github.com/charliefowle03/EvaAIassistant-Chrome-Version
+// @supportURL   https://github.com/charliefowle03/EvaAIassistant
+// @homepageURL  https://github.com/charliefowle03/EvaAIassistant
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
