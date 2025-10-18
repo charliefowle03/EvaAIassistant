@@ -2,7 +2,7 @@
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
 // @version      9.9.9
-// @description  Eva Widget with Global Theme Selection
+// @description  Eva Widget
 // @author       You
 // @match        *://*/*
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Eva%20Assistant%20Widget.user.js
@@ -1278,13 +1278,36 @@
         return container;
     };
 
+    // FIXED WATCHDOG FUNCTION - NO MORE TEXT DELETION
     const fastWatchdog = () => setInterval(() => {
         const widget = document.getElementById('eva-search-box');
-        if (!widget || !document.contains(widget) || widget.offsetParent === null) {
-            if (widget) widget.remove();
-            createFastWidget();
+        const input = document.getElementById('eva-search-input');
+
+        // Don't recreate if user is actively typing
+        if (input && document.activeElement === input) {
+            return;
         }
-    }, 2000);
+
+        // Only recreate if widget is actually missing or broken
+        if (!widget || !document.contains(widget) || widget.offsetParent === null) {
+            // Save the current input value before recreating
+            const savedValue = input ? input.value : '';
+
+            if (widget) widget.remove();
+            const newWidget = createFastWidget();
+
+            // Restore the saved value to the new input
+            if (savedValue && newWidget) {
+                setTimeout(() => {
+                    const newInput = newWidget.querySelector('#eva-search-input');
+                    if (newInput) {
+                        newInput.value = savedValue;
+                        newInput.focus();
+                    }
+                }, 50);
+            }
+        }
+    }, 5000); // Changed from 2000 to 5000 (less aggressive)
 
     const fastInit = () => {
         createFastWidget();
