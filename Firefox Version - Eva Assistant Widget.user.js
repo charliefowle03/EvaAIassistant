@@ -5,8 +5,8 @@
 // @description  Eva Widget
 // @author       You
 // @match        *://*/*
-// @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version-Eva%20Assistant%20Widget.user.js
-// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version-Eva%20Assistant%20Widget.user.js
+// @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
+// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
 // ==/UserScript==
 
 (function() {
