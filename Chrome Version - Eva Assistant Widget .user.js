@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Eva Assistant Widget - Chrome Optimized
 // @namespace    http://tampermonkey.net/
-// @version      10.5.1
+// @version      10.5.2
 // @description  Eva Widget - Chrome Optimized with Adjusted Length and Black Theme Text
 // @author       Enhanced Version
 // @match        *://*/*
