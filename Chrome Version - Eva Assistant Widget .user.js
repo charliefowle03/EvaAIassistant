@@ -5,8 +5,8 @@
 // @description  Eva Widget - Chrome Optimized with Adjusted Length and Black Theme Text
 // @author       Enhanced Version
 // @match        *://*/*
-// @updateURL    https://raw.githubusercontent.com/charliefowle03/EvaAIassistant-Chrome-Version/main/Eva%20Assistant%20-%20Chrome%20Version
-// @downloadURL  https://raw.githubusercontent.com/charliefowle03/EvaAIassistant-Chrome-Version/main/Eva%20Assistant%20-%20Chrome%20Version
+// @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Chrome%20Version%20-%20Eva%20Assistant%20Widget%20.user.js
+// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Chrome%20Version%20-%20Eva%20Assistant%20Widget%20.user.js
 // @supportURL   https://github.com/charliefowle03/EvaAIassistant-Chrome-Version
 // @homepageURL  https://github.com/charliefowle03/EvaAIassistant-Chrome-Version
 // @grant        GM_setValue
