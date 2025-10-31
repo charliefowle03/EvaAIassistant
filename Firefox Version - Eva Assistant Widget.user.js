@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  Eva Widget - Fixed Functionality
+// @version      1.5
+// @description  Eva Widget - Fixed Events & Top Center Position
 // @author       You
 // @match        *://*/*
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
@@ -492,6 +492,7 @@
         }
     };
 
+    // FIXED POSITION LOADING - TOP CENTER DEFAULT
     const domainSpecificLoadPos = () => {
         try {
             const posKey = getDomainKey('evaWidgetPosition');
@@ -527,10 +528,17 @@
             console.log('🎯 Domain-specific load failed:', e);
         }
 
+        // DEFAULT POSITION: TOP CENTER
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-        const defaultPos = { x: vw * 0.01, y: vh * 0.02 };
-        console.log('🎯 Using default position for domain:', window.location.hostname, ':', defaultPos);
+        const dimensions = getZoomResistantDimensions();
+        const widgetWidth = dimensions.expanded.width;
+        
+        const defaultPos = { 
+            x: (vw - widgetWidth) / 2, // Center horizontally
+            y: 20 // 20px from top
+        };
+        console.log('🎯 Using TOP CENTER default position for domain:', window.location.hostname, ':', defaultPos);
         return defaultPos;
     };
 
@@ -595,31 +603,34 @@
         });
     };
 
-    // GLOBAL SEARCH FUNCTION - MOVED OUTSIDE OF createFastWidget
+    // GLOBAL SEARCH FUNCTION - COMPLETELY REWRITTEN FOR RELIABILITY
     const performSearch = (query, fileMode = false) => {
-        console.log('🎯 DEBUG: performSearch called with query:', query);
-        console.log('🎯 DEBUG: fileMode:', fileMode);
+        console.log('🎯 🚀 SEARCH FUNCTION CALLED!');
+        console.log('🎯 Query:', query);
+        console.log('🎯 File Mode:', fileMode);
 
         // Don't proceed if no query and not in file mode
         if (!query && !fileMode) {
-            console.log('🎯 DEBUG: No query provided and not file mode, aborting');
+            console.log('🎯 ❌ No query provided and not file mode, aborting');
+            alert('Please enter a query or use attach mode');
             return false;
         }
 
         try {
-            // Test if GM functions work
-            console.log('🎯 DEBUG: Testing GM_setValue...');
+            console.log('🎯 💾 Setting GM values...');
             GM_setValue('cameFromWidget', true);
             GM_setValue('pendingEvaPrompt', query);
             GM_setValue('fileAttachMode', fileMode);
             
             // Verify the values were set
-            console.log('🎯 DEBUG: Values verification:');
-            console.log('🎯 DEBUG: cameFromWidget:', GM_getValue('cameFromWidget'));
-            console.log('🎯 DEBUG: pendingEvaPrompt:', GM_getValue('pendingEvaPrompt'));
-            console.log('🎯 DEBUG: fileAttachMode:', GM_getValue('fileAttachMode'));
+            const verification = {
+                cameFromWidget: GM_getValue('cameFromWidget'),
+                pendingEvaPrompt: GM_getValue('pendingEvaPrompt'),
+                fileAttachMode: GM_getValue('fileAttachMode')
+            };
+            console.log('🎯 ✅ Values verification:', verification);
 
-            console.log('🎯 DEBUG: Opening Eva page...');
+            console.log('🎯 🌐 Opening Eva page...');
 
             // Try multiple Eva URLs
             const evaUrls = [
@@ -631,26 +642,32 @@
             let opened = false;
             for (const url of evaUrls) {
                 try {
-                    const newWindow = window.open(url, '_blank');
-                    if (newWindow) {
+                    console.log('🎯 🔗 Trying to open:', url);
+                    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
+                    if (newWindow && !newWindow.closed) {
                         opened = true;
-                        console.log('🎯 DEBUG: Successfully opened:', url);
+                        console.log('🎯 ✅ Successfully opened:', url);
                         break;
+                    } else {
+                        console.log('🎯 ❌ Failed to open or was blocked:', url);
                     }
                 } catch (e) {
-                    console.log('🎯 DEBUG: Failed to open:', url, e);
+                    console.log('🎯 ❌ Exception opening:', url, e);
                 }
             }
 
             if (!opened) {
-                console.log('🎯 ERROR: Failed to open any Eva URL');
+                console.log('🎯 ❌ Failed to open any Eva URL - popup blocked?');
+                alert('Failed to open Eva. Please check if popups are blocked.');
                 return false;
             }
 
+            console.log('🎯 ✅ Search function completed successfully');
             return true;
 
         } catch (error) {
-            console.log('🎯 ERROR in performSearch:', error);
+            console.log('🎯 ❌ ERROR in performSearch:', error);
+            alert('Error occurred: ' + error.message);
             return false;
         }
     };
@@ -858,7 +875,7 @@
         const currentTheme = themes[currentThemeName] || themes.default;
         const dimensions = getZoomResistantDimensions();
 
-        console.log('🎯 Creating widget for domain:', window.location.hostname, 'at position:', pos, 'minimized:', isMin, 'global theme:', currentThemeName);
+        console.log('🎯 Creating widget for domain:', window.location.hostname, 'at TOP CENTER position:', pos, 'minimized:', isMin, 'global theme:', currentThemeName);
 
         const currentDim = isMin ? dimensions.minimized : dimensions.expanded;
         const zoom = dimensions.zoom;
@@ -1022,14 +1039,14 @@
         const fastEscape = () => {
             document.addEventListener('keydown', (e) => {
                 if (e.ctrlKey && e.shiftKey && e.key === 'E') {
+                    // Reset to top center
                     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-                    const resetX = Math.max(20, vw * 0.01);
-                    const resetY = Math.max(20, vh * 0.02);
+                    const resetX = (vw - currentDim.width) / 2;
+                    const resetY = 20;
                     container.style.left = resetX + 'px';
                     container.style.top = resetY + 'px';
                     domainSpecificSavePos(resetX, resetY);
-                    console.log('🎯 Position manually reset via Ctrl+Shift+E');
+                    console.log('🎯 Position manually reset to TOP CENTER via Ctrl+Shift+E');
                 }
             });
         };
@@ -1074,33 +1091,96 @@
 
         leftBtn.onclick = rightBtn.onclick = (e) => { e.stopPropagation(); fastToggleMin(); };
 
-        // FIXED EVENT HANDLERS - Using the global performSearch function
+        // COMPLETELY REWRITTEN EVENT HANDLERS WITH MULTIPLE APPROACHES
+        console.log('🎯 Setting up event handlers...');
+
+        // Method 1: Direct event listeners with capture
         attachBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
-            console.log('🎯 DEBUG: Attach button clicked!');
+            e.stopImmediatePropagation();
+            console.log('🎯 🖱️ ATTACH BUTTON CLICKED! (Method 1)');
             const query = input.value.trim();
             const success = performSearch(query, true);
             if (success) {
-                input.value = ''; // Clear input only on success
+                input.value = '';
             }
+        }, true); // Use capture phase
+
+        // Method 2: Mouse events for attach button
+        attachBtn.addEventListener('mousedown', (e) => {
+            console.log('🎯 🖱️ ATTACH BUTTON MOUSEDOWN!');
         });
 
+        attachBtn.addEventListener('mouseup', (e) => {
+            console.log('🎯 🖱️ ATTACH BUTTON MOUSEUP!');
+        });
+
+        // Method 3: Multiple event types for input
         input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
+            console.log('🎯 ⌨️ KEY PRESSED:', e.key, e.code);
+            if (e.key === 'Enter' || e.code === 'Enter') {
                 e.preventDefault();
-                console.log('🎯 DEBUG: Enter key pressed!');
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                console.log('🎯 ⌨️ ENTER KEY DETECTED! (Method 1)');
                 const query = input.value.trim();
                 const success = performSearch(query, false);
                 if (success) {
-                    input.value = ''; // Clear input only on success
+                    input.value = '';
                 }
+            }
+        }, true); // Use capture phase
+
+        // Method 4: Alternative keypress handler
+        input.addEventListener('keypress', (e) => {
+            console.log('🎯 ⌨️ KEYPRESS:', e.key, e.code);
+            if (e.key === 'Enter' || e.code === 'Enter') {
+                e.preventDefault();
+                console.log('🎯 ⌨️ ENTER KEY DETECTED! (Method 2)');
+                const query = input.value.trim();
+                performSearch(query, false);
             }
         });
 
-        // Also add click event for testing
-        input.addEventListener('click', () => {
-            console.log('🎯 DEBUG: Input clicked - focus should work');
+        // Method 5: Form submission handler (create a form wrapper)
+        const form = document.createElement('form');
+        form.style.cssText = 'margin: 0; padding: 0; display: contents;';
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            console.log('🎯 📝 FORM SUBMITTED!');
+            const query = input.value.trim();
+            const success = performSearch(query, false);
+            if (success) {
+                input.value = '';
+            }
         });
+
+        // Method 6: Global document event listeners
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement === input && (e.key === 'Enter' || e.code === 'Enter')) {
+                e.preventDefault();
+                console.log('🎯 ⌨️ GLOBAL ENTER DETECTED!');
+                const query = input.value.trim();
+                performSearch(query, false);
+            }
+        });
+
+        // Method 7: Focus and blur handlers for debugging
+        input.addEventListener('focus', () => {
+            console.log('🎯 🎯 INPUT FOCUSED');
+        });
+
+        input.addEventListener('blur', () => {
+            console.log('🎯 🎯 INPUT BLURRED');
+        });
+
+        // Method 8: Input change handlers
+        input.addEventListener('input', () => {
+            console.log('🎯 📝 INPUT CHANGED:', input.value);
+        });
+
+        console.log('🎯 ✅ All event handlers set up');
 
         const updateThemeStyles = (theme, zoom) => {
             const existingStyle = document.querySelector('style[data-eva-theme-styles]');
@@ -1137,7 +1217,9 @@
 
         updateThemeStyles(currentTheme, zoom);
 
-        inputContainer.append(input, attachBtn);
+        // Wrap input in form for better form handling
+        form.appendChild(input);
+        inputContainer.append(form, attachBtn);
         container.append(inputContainer, leftBtn, rightBtn);
 
         if (isMin) {
@@ -1147,8 +1229,16 @@
         document.body.appendChild(container);
         evaWidget = container;
 
-        fastDraggable(container, ['input', 'svg', '.eva-minimize-button']);
+        fastDraggable(container, ['input', 'svg', '.eva-minimize-button', 'form']);
         fastEscape();
+
+        // Focus the input for immediate use
+        setTimeout(() => {
+            if (!isMin) {
+                input.focus();
+                console.log('🎯 🎯 Input focused for immediate use');
+            }
+        }, 100);
 
         // Handle window resize and zoom changes (keeping existing resize handler)
         const handleResize = () => {
