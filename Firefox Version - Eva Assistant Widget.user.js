@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      1.3
-// @description  Eva Widget - Fixed Position & Functionality
+// @version      1.4
+// @description  Eva Widget - Fixed Functionality
 // @author       You
 // @match        *://*/*
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
@@ -103,16 +103,13 @@
         }
     };
 
-    // GLOBAL THEME MANAGEMENT - NO DOMAIN SPECIFIC KEYS
+    // GLOBAL THEME MANAGEMENT
     const saveGlobalTheme = (themeName) => {
         try {
-            // Use simple global keys without domain specificity
             GM_setValue('evaWidgetGlobalTheme', themeName);
             GM_setValue('evaWidgetGlobalThemeBackup', themeName);
             GM_setValue('evaWidgetThemeTimestamp', Date.now());
             console.log('🎯 Global theme saved:', themeName);
-
-            // Broadcast theme change to other tabs/windows
             broadcastThemeChange(themeName);
         } catch (e) {
             console.log('🎯 Global theme save failed:', e);
@@ -121,7 +118,6 @@
 
     const loadGlobalTheme = () => {
         try {
-            // Load from global keys
             const savedTheme = GM_getValue('evaWidgetGlobalTheme', 'default') ||
                               GM_getValue('evaWidgetGlobalThemeBackup', 'default');
             console.log('🎯 Global theme loaded:', savedTheme);
@@ -132,10 +128,8 @@
         }
     };
 
-    // CROSS-TAB THEME SYNCHRONIZATION
     const broadcastThemeChange = (themeName) => {
         try {
-            // Set a broadcast flag that other instances can detect
             GM_setValue('evaWidgetThemeBroadcast', JSON.stringify({
                 theme: themeName,
                 timestamp: Date.now(),
@@ -147,7 +141,6 @@
         }
     };
 
-    // Listen for theme changes from other tabs
     const listenForThemeChanges = (applyThemeCallback) => {
         let lastBroadcastTimestamp = 0;
 
@@ -156,8 +149,6 @@
                 const broadcastData = GM_getValue('evaWidgetThemeBroadcast', '');
                 if (broadcastData) {
                     const data = JSON.parse(broadcastData);
-
-                    // Only apply if this is a new broadcast and not from this window
                     if (data.timestamp > lastBroadcastTimestamp && data.source !== window.location.href) {
                         lastBroadcastTimestamp = data.timestamp;
                         console.log('🎯 Received theme change from another tab:', data.theme);
@@ -169,20 +160,17 @@
             }
         };
 
-        // Check for updates every 500ms
         setInterval(checkForThemeUpdates, 500);
     };
 
     const isEvaPage = window.location.hostname.includes('datacenteracademy.dco.aws.dev') || window.location.hostname.includes('eva.aws.dev');
 
-    // DEBUG: Log page detection
     console.log('🎯 DEBUG: Current hostname:', window.location.hostname);
     console.log('🎯 DEBUG: Is Eva page:', isEvaPage);
 
     if (isEvaPage) {
         console.log('🎯 DEBUG: Eva page detected');
 
-        // MEGA PROTECTION - MULTIPLE LAYERS
         if (window.EVA_PAGE_PROCESSED ||
             window.EVA_PASTE_STARTED ||
             window.EVA_HANDLER_RUNNING ||
@@ -191,12 +179,10 @@
             return;
         }
 
-        // Set ALL protection flags immediately
         window.EVA_PAGE_PROCESSED = true;
         window.EVA_PASTE_STARTED = true;
         window.EVA_HANDLER_RUNNING = true;
 
-        // Add DOM marker
         const marker = document.createElement('div');
         marker.setAttribute('data-eva-processed', 'true');
         marker.style.display = 'none';
@@ -204,7 +190,6 @@
 
         console.log('🎯 DEBUG: ALL PROTECTION FLAGS SET');
 
-        // Get stored values ONCE
         const storedPrompt = GM_getValue('pendingEvaPrompt', '');
         const isFileMode = GM_getValue('fileAttachMode', false);
         const cameFromWidget = GM_getValue('cameFromWidget', false);
@@ -213,19 +198,16 @@
         console.log('🎯 DEBUG: isFileMode:', isFileMode);
         console.log('🎯 DEBUG: cameFromWidget:', cameFromWidget);
 
-        // CLEAR VALUES IMMEDIATELY to prevent any other instance from using them
         GM_setValue('pendingEvaPrompt', '');
         GM_setValue('fileAttachMode', false);
         GM_setValue('cameFromWidget', false);
         console.log('🎯 DEBUG: Values cleared immediately to prevent duplicates');
 
-        // Only proceed if we actually have something to do
         if (!cameFromWidget && !storedPrompt && !isFileMode) {
             console.log('🎯 DEBUG: No conditions met for processing - exiting');
             return;
         }
 
-        // BALANCED TYPING SIMULATION
         const balancedTyping = async (input, text) => {
             if (window.EVA_PASTE_EXECUTED) {
                 console.log('🎯 TYPING ALREADY EXECUTED - BLOCKING');
@@ -236,18 +218,14 @@
             console.log('🎯 BALANCED TYPING SIMULATION:', text);
 
             try {
-                // Focus and clear
                 input.focus();
                 input.click();
                 input.value = '';
 
-                // Balanced delay - 50ms
                 await new Promise(resolve => setTimeout(resolve, 50));
 
-                // Set the value directly first
                 input.value = text;
 
-                // Fire React events with small delays between them
                 const events = [
                     new CompositionEvent('compositionstart', { bubbles: true }),
                     new Event('input', { bubbles: true, cancelable: true, composed: true }),
@@ -257,15 +235,13 @@
                     new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter' })
                 ];
 
-                // Fire events with tiny delays
                 for (let i = 0; i < events.length; i++) {
                     input.dispatchEvent(events[i]);
                     if (i < events.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 10)); // 10ms between events
+                        await new Promise(resolve => setTimeout(resolve, 10));
                     }
                 }
 
-                // Force React to notice the change with native setters
                 try {
                     const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                     const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
@@ -276,7 +252,6 @@
                         nativeTextAreaValueSetter.call(input, text);
                     }
 
-                    // Final input event after native setter
                     input.dispatchEvent(new Event('input', { bubbles: true }));
                 } catch (e) {
                     console.log('🎯 Native setter failed, continuing anyway');
@@ -284,7 +259,6 @@
 
                 console.log('🎯 BALANCED TYPING COMPLETED');
 
-                // Quick debug check
                 setTimeout(() => {
                     const submitBtn = document.querySelector('button[data-testid="submit-follow-up-prompt"]') ||
                                      document.querySelector('button[type="submit"]');
@@ -300,11 +274,10 @@
             }
         };
 
-        // BALANCED SUBMIT BUTTON DETECTION
         const waitForSubmitButton = () => {
             return new Promise((resolve) => {
                 let attempts = 0;
-                const maxAttempts = 60; // 4.5 seconds max (60 * 75ms)
+                const maxAttempts = 60;
 
                 const checkButton = () => {
                     const submitBtn = document.querySelector('button[data-testid="submit-follow-up-prompt"]') ||
@@ -313,7 +286,7 @@
                                      document.querySelector('button[aria-label*="Submit"]') ||
                                      document.querySelector('form button:not([disabled])');
 
-                    if (attempts % 8 === 0) { // Log every 8th attempt
+                    if (attempts % 8 === 0) {
                         console.log('🎯 DEBUG: Button check attempt', attempts + 1, '- Found:', !!submitBtn, 'Disabled:', submitBtn?.disabled);
                     }
 
@@ -322,7 +295,7 @@
                         resolve(submitBtn);
                     } else if (attempts < maxAttempts) {
                         attempts++;
-                        setTimeout(checkButton, 75); // Check every 75ms
+                        setTimeout(checkButton, 75);
                     } else {
                         console.log('🎯 DEBUG: Submit button never became enabled after', maxAttempts, 'attempts');
                         resolve(null);
@@ -333,7 +306,6 @@
             });
         };
 
-        // BALANCED SUBMIT FUNCTION - ONLY FOR NON-FILE MODE
         const doBalancedSubmit = async () => {
             if (window.EVA_SUBMIT_EXECUTED) {
                 console.log('🎯 SUBMIT ALREADY EXECUTED - BLOCKING');
@@ -355,7 +327,6 @@
             }
         };
 
-        // ATTACHMENT BUTTON GLOW FUNCTION
         const addAttachmentGlow = () => {
             console.log('🎯 File mode - adding attachment button glow');
 
@@ -368,25 +339,21 @@
             `);
 
             const findAttachButton = () => {
-                // Try multiple ways to find the attachment button
                 const allButtons = document.querySelectorAll('button');
                 console.log('🎯 DEBUG: Found', allButtons.length, 'buttons total');
 
-                // Try the 6th button (index 5) as before
                 if (allButtons.length > 5) {
                     const button5 = allButtons[5];
                     console.log('🎯 DEBUG: Button 6 text:', button5.textContent?.trim());
                     console.log('🎯 DEBUG: Button 6 aria-label:', button5.getAttribute('aria-label'));
                     button5.classList.add('fast-pulse');
 
-                    // Remove glow after 15 seconds or when clicked
                     setTimeout(() => button5.classList.remove('fast-pulse'), 15000);
                     button5.addEventListener('click', () => {
                         setTimeout(() => button5.classList.remove('fast-pulse'), 1000);
                     }, { once: true });
                 }
 
-                // Also try to find attachment button by other methods
                 const attachButtons = document.querySelectorAll('button[aria-label*="attach"], button[title*="attach"], button[aria-label*="file"], button[title*="file"]');
                 attachButtons.forEach(btn => {
                     console.log('🎯 DEBUG: Found potential attach button:', btn.textContent?.trim(), btn.getAttribute('aria-label'));
@@ -395,17 +362,14 @@
                 });
             };
 
-            // Try to find the button multiple times
             setTimeout(findAttachButton, 100);
             setTimeout(findAttachButton, 500);
             setTimeout(findAttachButton, 1000);
         };
 
-        // FASTER EXECUTION HANDLER
         const executeFaster = async () => {
             console.log('🎯 FASTER EXECUTION STARTING');
 
-            // Wait for page to be ready
             await new Promise(resolve => {
                 if (document.readyState === 'complete') {
                     resolve();
@@ -414,15 +378,12 @@
                 }
             });
 
-            // FASTER delay - 600ms
             console.log('🎯 DEBUG: Waiting 600ms for page to settle...');
             await new Promise(resolve => setTimeout(resolve, 600));
 
-            // ALWAYS PASTE THE PROMPT IF WE HAVE ONE (both file mode and regular mode)
             if (storedPrompt && (cameFromWidget || isFileMode)) {
                 console.log('🎯 Processing prompt for', isFileMode ? 'FILE MODE' : 'REGULAR MODE');
 
-                // Look for input field
                 let input = null;
                 for (let i = 0; i < 35; i++) {
                     input = document.querySelector('[data-testid="prompt-input"]') ||
@@ -444,14 +405,12 @@
                     if (success) {
                         console.log('🎯 TYPING SUCCESS for', isFileMode ? 'FILE MODE' : 'REGULAR MODE');
 
-                        // Only auto-submit for regular mode, not file mode
                         if (!isFileMode) {
                             console.log('🎯 Regular mode - auto-submitting...');
                             await new Promise(resolve => setTimeout(resolve, 400));
                             await doBalancedSubmit();
                         } else {
                             console.log('🎯 File mode - skipping auto-submit, adding attachment glow...');
-                            // Add glow to attachment button for file mode
                             setTimeout(addAttachmentGlow, 500);
                         }
                     }
@@ -460,7 +419,6 @@
                 }
             }
 
-            // Handle file mode without prompt (just glow the attachment button)
             if (isFileMode && !storedPrompt) {
                 console.log('🎯 File mode without prompt - just adding glow');
                 setTimeout(addAttachmentGlow, 500);
@@ -469,7 +427,6 @@
             console.log('🎯 FASTER EXECUTION COMPLETED');
         };
 
-        // EXECUTE FASTER
         console.log('🎯 STARTING FASTER EXECUTION');
         executeFaster();
 
@@ -479,21 +436,16 @@
     // ZOOM-RESISTANT DIMENSIONS AND POSITIONING
     let evaWidget = null;
 
-    // Get current browser zoom level
     const getZoomLevel = () => {
         return window.devicePixelRatio || 1;
     };
 
-    // Get zoom-resistant dimensions (7% bigger than the previous 19% increase)
     const getZoomResistantDimensions = () => {
         const zoom = getZoomLevel();
+        const baseWidth = 181.45;
+        const baseHeight = 34.38;
+        const minWidth = 33.43;
 
-        // Base dimensions: Previous size (169.575×32.13) increased by 7% = 181.45×34.38
-        const baseWidth = 181.45; // 169.575 * 1.07
-        const baseHeight = 34.38; // 32.13 * 1.07
-        const minWidth = 33.43; // 31.24 * 1.07
-
-        // Apply zoom compensation
         const widgetWidth = baseWidth / zoom;
         const widgetHeight = baseHeight / zoom;
         const minWidgetWidth = minWidth / zoom;
@@ -505,13 +457,11 @@
         };
     };
 
-    // Create domain-specific storage keys
     const getDomainKey = (baseKey) => {
         const domain = window.location.hostname.replace(/[^a-zA-Z0-9]/g, '_');
         return `${baseKey}_${domain}`;
     };
 
-    // FIXED POSITION SAVING FUNCTION
     const domainSpecificSavePos = (x, y) => {
         try {
             const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
@@ -528,7 +478,6 @@
                 url: window.location.hostname
             };
 
-            // Save to domain-specific keys
             const posKey = getDomainKey('evaWidgetPosition');
             const backupKey = getDomainKey('evaWidgetPositionBackup');
             const backup2Key = getDomainKey('evaWidgetPositionBackup2');
@@ -545,7 +494,6 @@
 
     const domainSpecificLoadPos = () => {
         try {
-            // Try domain-specific keys first
             const posKey = getDomainKey('evaWidgetPosition');
             const backupKey = getDomainKey('evaWidgetPositionBackup');
             const backup2Key = getDomainKey('evaWidgetPositionBackup2');
@@ -562,12 +510,10 @@
                     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
                     const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
 
-                    // Use percentage-based positioning for better cross-page consistency
                     let x = (pos.percentX * vw) / 100;
                     let y = (pos.percentY * vh) / 100;
 
-                    // Ensure widget stays on screen with zoom-resistant margins
-                    const margin = Math.min(vw * 0.01, 20); // 1% of viewport or 20px, whichever is smaller
+                    const margin = Math.min(vw * 0.01, 20);
                     x = Math.max(margin, Math.min(x, vw - 200));
                     y = Math.max(margin, Math.min(y, vh - 50));
 
@@ -581,7 +527,6 @@
             console.log('🎯 Domain-specific load failed:', e);
         }
 
-        // Default position using viewport units
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const defaultPos = { x: vw * 0.01, y: vh * 0.02 };
@@ -616,7 +561,6 @@
         }
     };
 
-    // FIXED DRAGGABLE FUNCTION
     const fastDraggable = (el, excludes) => {
         let dragging = false, startX, startY, initX, initY;
         const isExcluded = (target) => excludes.some(sel => target.matches && (target.matches(sel) || target.closest(sel)));
@@ -644,7 +588,6 @@
             if (!dragging) return;
             dragging = false;
             document.body.style.cursor = '';
-            // Save position immediately after drag ends
             const finalX = parseInt(el.style.left) || 0;
             const finalY = parseInt(el.style.top) || 0;
             domainSpecificSavePos(finalX, finalY);
@@ -652,9 +595,68 @@
         });
     };
 
-    // Theme context menu
+    // GLOBAL SEARCH FUNCTION - MOVED OUTSIDE OF createFastWidget
+    const performSearch = (query, fileMode = false) => {
+        console.log('🎯 DEBUG: performSearch called with query:', query);
+        console.log('🎯 DEBUG: fileMode:', fileMode);
+
+        // Don't proceed if no query and not in file mode
+        if (!query && !fileMode) {
+            console.log('🎯 DEBUG: No query provided and not file mode, aborting');
+            return false;
+        }
+
+        try {
+            // Test if GM functions work
+            console.log('🎯 DEBUG: Testing GM_setValue...');
+            GM_setValue('cameFromWidget', true);
+            GM_setValue('pendingEvaPrompt', query);
+            GM_setValue('fileAttachMode', fileMode);
+            
+            // Verify the values were set
+            console.log('🎯 DEBUG: Values verification:');
+            console.log('🎯 DEBUG: cameFromWidget:', GM_getValue('cameFromWidget'));
+            console.log('🎯 DEBUG: pendingEvaPrompt:', GM_getValue('pendingEvaPrompt'));
+            console.log('🎯 DEBUG: fileAttachMode:', GM_getValue('fileAttachMode'));
+
+            console.log('🎯 DEBUG: Opening Eva page...');
+
+            // Try multiple Eva URLs
+            const evaUrls = [
+                'https://datacenteracademy.dco.aws.dev/assistant',
+                'https://eva.aws.dev/assistant',
+                'https://eva.aws.dev'
+            ];
+
+            let opened = false;
+            for (const url of evaUrls) {
+                try {
+                    const newWindow = window.open(url, '_blank');
+                    if (newWindow) {
+                        opened = true;
+                        console.log('🎯 DEBUG: Successfully opened:', url);
+                        break;
+                    }
+                } catch (e) {
+                    console.log('🎯 DEBUG: Failed to open:', url, e);
+                }
+            }
+
+            if (!opened) {
+                console.log('🎯 ERROR: Failed to open any Eva URL');
+                return false;
+            }
+
+            return true;
+
+        } catch (error) {
+            console.log('🎯 ERROR in performSearch:', error);
+            return false;
+        }
+    };
+
+    // Theme context menu (keeping existing code)
     const createThemeMenu = (x, y, applyThemeCallback) => {
-        // Remove existing menu if any
         const existingMenu = document.getElementById('eva-theme-menu');
         if (existingMenu) existingMenu.remove();
 
@@ -677,7 +679,6 @@
 
         const currentTheme = loadGlobalTheme();
 
-        // Add header
         const header = document.createElement('div');
         header.style.cssText = `
             padding: 8px 15px !important;
@@ -756,15 +757,12 @@
                 applyThemeCallback(themeKey);
                 menu.remove();
                 console.log('🎯 Global theme changed to:', theme.name);
-
-                // Show confirmation
                 showThemeChangeNotification(theme.name);
             };
 
             menu.appendChild(item);
         });
 
-        // Add footer info
         const footer = document.createElement('div');
         footer.style.cssText = `
             padding: 6px 15px !important;
@@ -779,7 +777,6 @@
 
         document.body.appendChild(menu);
 
-        // Close menu when clicking outside
         const closeMenu = (e) => {
             if (!menu.contains(e.target)) {
                 menu.remove();
@@ -788,7 +785,6 @@
         };
         setTimeout(() => document.addEventListener('click', closeMenu), 100);
 
-        // Ensure menu stays on screen
         const rect = menu.getBoundingClientRect();
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
@@ -803,7 +799,6 @@
         return menu;
     };
 
-    // Theme change notification
     const showThemeChangeNotification = (themeName) => {
         const notification = document.createElement('div');
         notification.style.cssText = `
@@ -835,13 +830,11 @@
 
         document.body.appendChild(notification);
 
-        // Animate in
         setTimeout(() => {
             notification.style.opacity = '1';
             notification.style.transform = 'translateX(0)';
         }, 100);
 
-        // Animate out and remove
         setTimeout(() => {
             notification.style.opacity = '0';
             notification.style.transform = 'translateX(100%)';
@@ -861,12 +854,11 @@
 
         const pos = domainSpecificLoadPos();
         const isMin = domainSpecificLoadMin();
-        const currentThemeName = loadGlobalTheme(); // Use global theme
+        const currentThemeName = loadGlobalTheme();
         const currentTheme = themes[currentThemeName] || themes.default;
         const dimensions = getZoomResistantDimensions();
 
         console.log('🎯 Creating widget for domain:', window.location.hostname, 'at position:', pos, 'minimized:', isMin, 'global theme:', currentThemeName);
-        console.log('🎯 Widget dimensions:', dimensions);
 
         const currentDim = isMin ? dimensions.minimized : dimensions.expanded;
         const zoom = dimensions.zoom;
@@ -994,23 +986,18 @@
         const leftBtn = createFastMinBtn('left', isMin ? '◀' : '▶');
         const rightBtn = createFastMinBtn('right', isMin ? '▶' : '◀');
 
-        // Apply theme function
         const applyTheme = (themeName) => {
             const theme = themes[themeName] || themes.default;
 
-            // Update container
             container.style.background = theme.background;
             container.style.borderColor = theme.border;
 
-            // Update input
             input.style.backgroundColor = theme.inputBg;
             input.style.color = theme.inputText;
 
-            // Update attachment icon
             const svg = attachBtn.querySelector('svg path');
             if (svg) svg.setAttribute('stroke', theme.iconColor);
 
-            // Update minimize buttons
             [leftBtn, rightBtn].forEach(btn => {
                 btn.style.backgroundColor = theme.buttonBg;
                 btn.style.color = theme.buttonText;
@@ -1019,25 +1006,20 @@
                 btn.onmouseleave = () => btn.style.backgroundColor = theme.buttonBg;
             });
 
-            // Update CSS styles
             updateThemeStyles(theme, zoom);
 
             console.log('🎯 Global theme applied:', theme.name);
         };
 
-        // Right-click context menu
         container.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             e.stopPropagation();
             createThemeMenu(e.clientX, e.clientY, applyTheme);
         });
 
-        // Listen for theme changes from other tabs
         listenForThemeChanges(applyTheme);
 
-        // FIXED ESCAPE FUNCTION - REMOVED DOUBLE CLICK RESET
         const fastEscape = () => {
-            // Only keep the keyboard shortcut for manual reset
             document.addEventListener('keydown', (e) => {
                 if (e.ctrlKey && e.shiftKey && e.key === 'E') {
                     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
@@ -1066,8 +1048,6 @@
                 inputContainer.style.justifyContent = 'center';
                 leftBtn.innerHTML = '◀';
                 rightBtn.innerHTML = '▶';
-
-                // Add pulsing glow when minimized
                 container.classList.add('eva-minimized-pulse');
             } else {
                 input.style.display = 'block';
@@ -1077,11 +1057,8 @@
                 inputContainer.style.justifyContent = 'space-between';
                 leftBtn.innerHTML = '▶';
                 rightBtn.innerHTML = '◀';
-
-                // Remove pulsing glow when expanded
                 container.classList.remove('eva-minimized-pulse');
 
-                // Ensure widget stays on screen after expansion
                 const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
                 const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
                 const rect = container.getBoundingClientRect();
@@ -1097,90 +1074,49 @@
 
         leftBtn.onclick = rightBtn.onclick = (e) => { e.stopPropagation(); fastToggleMin(); };
 
-        // FIXED SEARCH FUNCTION
-        const fastSearch = (fileMode = false) => {
+        // FIXED EVENT HANDLERS - Using the global performSearch function
+        attachBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            console.log('🎯 DEBUG: Attach button clicked!');
             const query = input.value.trim();
-
-            console.log('🎯 DEBUG: fastSearch called with query:', query);
-            console.log('🎯 DEBUG: fileMode:', fileMode);
-
-            // Don't proceed if no query and not in file mode
-            if (!query && !fileMode) {
-                console.log('🎯 DEBUG: No query provided and not file mode, aborting');
-                return;
+            const success = performSearch(query, true);
+            if (success) {
+                input.value = ''; // Clear input only on success
             }
+        });
 
-            try {
-                GM_setValue('cameFromWidget', true);
-                GM_setValue('pendingEvaPrompt', query);
-                GM_setValue('fileAttachMode', fileMode);
-                
-                console.log('🎯 DEBUG: Values set successfully');
-                console.log('🎯 DEBUG: cameFromWidget:', GM_getValue('cameFromWidget'));
-                console.log('🎯 DEBUG: pendingEvaPrompt:', GM_getValue('pendingEvaPrompt'));
-                console.log('🎯 DEBUG: fileAttachMode:', GM_getValue('fileAttachMode'));
-
-                // Clear the input field after storing the query
-                input.value = '';
-
-                console.log('🎯 DEBUG: Opening Eva page...');
-
-                // Try multiple Eva URLs in case one doesn't work
-                const evaUrls = [
-                    'https://datacenteracademy.dco.aws.dev/assistant',
-                    'https://eva.aws.dev/assistant',
-                    'https://eva.aws.dev'
-                ];
-
-                // Try the first URL, if it fails, try others
-                let opened = false;
-                for (const url of evaUrls) {
-                    try {
-                        window.open(url, '_blank');
-                        opened = true;
-                        console.log('🎯 DEBUG: Successfully opened:', url);
-                        break;
-                    } catch (e) {
-                        console.log('🎯 DEBUG: Failed to open:', url, e);
-                    }
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                console.log('🎯 DEBUG: Enter key pressed!');
+                const query = input.value.trim();
+                const success = performSearch(query, false);
+                if (success) {
+                    input.value = ''; // Clear input only on success
                 }
-
-                if (!opened) {
-                    console.log('🎯 ERROR: Failed to open any Eva URL');
-                    // Restore the query to input if opening failed
-                    input.value = query;
-                }
-
-            } catch (error) {
-                console.log('🎯 ERROR in fastSearch:', error);
-                // Restore the query to input if there was an error
-                input.value = query;
             }
-        };
+        });
 
-        attachBtn.onclick = (e) => { e.stopPropagation(); fastSearch(true); };
-        input.onkeydown = (e) => { if (e.key === 'Enter') fastSearch(); };
+        // Also add click event for testing
+        input.addEventListener('click', () => {
+            console.log('🎯 DEBUG: Input clicked - focus should work');
+        });
 
-        // Update theme styles function
         const updateThemeStyles = (theme, zoom) => {
-            // Remove existing theme styles
             const existingStyle = document.querySelector('style[data-eva-theme-styles]');
             if (existingStyle) existingStyle.remove();
 
-            // Add new theme styles
             const style = document.createElement('style');
             style.setAttribute('data-eva-theme-styles', 'true');
             style.textContent = `
                 #eva-search-input::placeholder{color:${theme.inputPlaceholder}!important;opacity:1!important}
                 #eva-search-input:focus{outline:none!important;box-shadow:0 0 0 ${1/zoom}px ${theme.focusColor}!important}
 
-                /* Zoom-resistant widget styles */
                 #eva-search-box * {
                     transform: scale(1) !important;
                     transform-origin: top left !important;
                 }
 
-                /* Minimized widget pulsing glow animation with zoom compensation */
                 @keyframes minimizedPulse {
                     0%, 100% {
                         border-color: ${theme.border} !important;
@@ -1199,13 +1135,11 @@
             document.head.appendChild(style);
         };
 
-        // Initial theme styles
         updateThemeStyles(currentTheme, zoom);
 
         inputContainer.append(input, attachBtn);
         container.append(inputContainer, leftBtn, rightBtn);
 
-        // Apply pulsing effect if starting minimized
         if (isMin) {
             container.classList.add('eva-minimized-pulse');
         }
@@ -1216,16 +1150,15 @@
         fastDraggable(container, ['input', 'svg', '.eva-minimize-button']);
         fastEscape();
 
-        // Handle window resize and zoom changes to maintain consistent dimensions
+        // Handle window resize and zoom changes (keeping existing resize handler)
         const handleResize = () => {
             setTimeout(() => {
                 const newDimensions = getZoomResistantDimensions();
                 const currentMin = input.style.display === 'none';
                 const newDim = currentMin ? newDimensions.minimized : newDimensions.expanded;
                 const newZoom = newDimensions.zoom;
-                const theme = themes[loadGlobalTheme()] || themes.default; // Use global theme
+                const theme = themes[loadGlobalTheme()] || themes.default;
 
-                // Update container dimensions and styles
                 container.style.width = newDim.width + 'px';
                 container.style.height = newDim.height + 'px';
                 container.style.border = (2/newZoom) + 'px solid ' + theme.border;
@@ -1235,12 +1168,10 @@
                     (4/newZoom) + 'px ' + (3/newZoom) + 'px' :
                     (4/newZoom) + 'px ' + (5/newZoom) + 'px';
 
-                // Update input container
                 inputContainer.style.gap = (2/newZoom) + 'px';
                 inputContainer.style.height = (newDim.height - 8/newZoom) + 'px';
 
                 if (!currentMin) {
-                    // Update input field
                     input.style.width = (newDim.width - 50/newZoom) + 'px';
                     input.style.height = Math.max(22/newZoom, newDim.height * 0.6) + 'px';
                     input.style.padding = '0 ' + (6/newZoom) + 'px';
@@ -1249,7 +1180,6 @@
                     input.style.lineHeight = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
                 }
 
-                // Update attachment button
                 const newSvgSize = Math.max(16/newZoom, newDim.height * 0.44);
                 const svg = attachBtn.querySelector('svg');
                 if (svg) {
@@ -1262,7 +1192,6 @@
                 attachBtn.style.padding = (2/newZoom) + 'px';
                 attachBtn.style.borderRadius = (3/newZoom) + 'px';
 
-                // Update minimize buttons
                 [leftBtn, rightBtn].forEach((btn, index) => {
                     const side = index === 0 ? 'left' : 'right';
                     btn.style[side] = (-10/newZoom) + 'px';
@@ -1275,7 +1204,6 @@
                         '0 ' + (3/newZoom) + 'px ' + (3/newZoom) + 'px 0';
                 });
 
-                // Update theme styles
                 updateThemeStyles(theme, newZoom);
 
                 domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
@@ -1285,7 +1213,6 @@
 
         window.addEventListener('resize', handleResize);
 
-        // Also listen for zoom changes (devicePixelRatio changes)
         let currentZoom = getZoomLevel();
         setInterval(() => {
             const newZoom = getZoomLevel();
@@ -1296,7 +1223,6 @@
             }
         }, 500);
 
-        // DOMAIN-SPECIFIC POSITION SAVING - Multiple triggers
         window.addEventListener('beforeunload', () => {
             domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
             console.log('🎯 Position saved on page unload for domain:', window.location.hostname);
@@ -1307,35 +1233,29 @@
             console.log('🎯 Position saved on page hide for domain:', window.location.hostname);
         });
 
-        // Save position more frequently
         setInterval(() => {
             domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
-        }, 2000); // Every 2 seconds
+        }, 2000);
 
         return container;
     };
 
-    // FIXED WATCHDOG FUNCTION - MUCH LESS AGGRESSIVE
     const fastWatchdog = () => setInterval(() => {
         const widget = document.getElementById('eva-search-box');
         const input = document.getElementById('eva-search-input');
 
-        // Don't recreate if user is actively typing or if widget exists and is visible
         if (input && document.activeElement === input) {
             return;
         }
 
-        // Only recreate if widget is actually missing or completely broken
         if (!widget || !document.contains(widget)) {
             console.log('🎯 Widget missing, recreating...');
             
-            // Save the current input value before recreating
             const savedValue = input ? input.value : '';
 
             if (widget) widget.remove();
             const newWidget = createFastWidget();
 
-            // Restore the saved value to the new input
             if (savedValue && newWidget) {
                 setTimeout(() => {
                     const newInput = newWidget.querySelector('#eva-search-input');
@@ -1345,7 +1265,7 @@
                 }, 100);
             }
         }
-    }, 10000); // Changed from 5000 to 10000 (much less aggressive)
+    }, 10000);
 
     const fastInit = () => {
         createFastWidget();
