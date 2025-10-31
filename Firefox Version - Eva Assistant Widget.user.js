@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      1.2
-// @description  Eva Widget
+// @version      1.3
+// @description  Eva Widget - Fixed Position & Functionality
 // @author       You
 // @match        *://*/*
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
@@ -11,6 +11,10 @@
 
 (function() {
     'use strict';
+
+    // Add debugging for storage availability
+    console.log('🎯 DEBUG: GM_setValue available:', typeof GM_setValue !== 'undefined');
+    console.log('🎯 DEBUG: GM_getValue available:', typeof GM_getValue !== 'undefined');
 
     // ULTIMATE PROTECTION - CHECK IMMEDIATELY
     if (window.evaWidgetRan || window.EVA_SCRIPT_LOADED) {
@@ -507,6 +511,7 @@
         return `${baseKey}_${domain}`;
     };
 
+    // FIXED POSITION SAVING FUNCTION
     const domainSpecificSavePos = (x, y) => {
         try {
             const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
@@ -611,6 +616,7 @@
         }
     };
 
+    // FIXED DRAGGABLE FUNCTION
     const fastDraggable = (el, excludes) => {
         let dragging = false, startX, startY, initX, initY;
         const isExcluded = (target) => excludes.some(sel => target.matches && (target.matches(sel) || target.closest(sel)));
@@ -638,7 +644,11 @@
             if (!dragging) return;
             dragging = false;
             document.body.style.cursor = '';
-            domainSpecificSavePos(parseInt(el.style.left) || 0, parseInt(el.style.top) || 0);
+            // Save position immediately after drag ends
+            const finalX = parseInt(el.style.left) || 0;
+            const finalY = parseInt(el.style.top) || 0;
+            domainSpecificSavePos(finalX, finalY);
+            console.log('🎯 Position saved after drag:', finalX, finalY);
         });
     };
 
@@ -1025,13 +1035,11 @@
         // Listen for theme changes from other tabs
         listenForThemeChanges(applyTheme);
 
+        // FIXED ESCAPE FUNCTION - REMOVED DOUBLE CLICK RESET
         const fastEscape = () => {
-            let clickCount = 0;
-            const resetPosition = () => {
-                clickCount++;
-                if (clickCount === 1) {
-                    setTimeout(() => clickCount = 0, 300);
-                } else if (clickCount === 2) {
+            // Only keep the keyboard shortcut for manual reset
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.shiftKey && e.key === 'E') {
                     const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
                     const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
                     const resetX = Math.max(20, vw * 0.01);
@@ -1039,10 +1047,9 @@
                     container.style.left = resetX + 'px';
                     container.style.top = resetY + 'px';
                     domainSpecificSavePos(resetX, resetY);
-                    clickCount = 0;
+                    console.log('🎯 Position manually reset via Ctrl+Shift+E');
                 }
-            };
-            container.addEventListener('click', resetPosition);
+            });
         };
 
         const fastToggleMin = () => {
@@ -1090,38 +1097,69 @@
 
         leftBtn.onclick = rightBtn.onclick = (e) => { e.stopPropagation(); fastToggleMin(); };
 
+        // FIXED SEARCH FUNCTION
         const fastSearch = (fileMode = false) => {
             const query = input.value.trim();
 
             console.log('🎯 DEBUG: fastSearch called with query:', query);
             console.log('🎯 DEBUG: fileMode:', fileMode);
 
-            GM_setValue('cameFromWidget', true);
-            GM_setValue('pendingEvaPrompt', query);
-            GM_setValue('fileAttachMode', fileMode);
+            // Don't proceed if no query and not in file mode
+            if (!query && !fileMode) {
+                console.log('🎯 DEBUG: No query provided and not file mode, aborting');
+                return;
+            }
 
-            // Clear the input field after storing the query
-            input.value = '';
+            try {
+                GM_setValue('cameFromWidget', true);
+                GM_setValue('pendingEvaPrompt', query);
+                GM_setValue('fileAttachMode', fileMode);
+                
+                console.log('🎯 DEBUG: Values set successfully');
+                console.log('🎯 DEBUG: cameFromWidget:', GM_getValue('cameFromWidget'));
+                console.log('🎯 DEBUG: pendingEvaPrompt:', GM_getValue('pendingEvaPrompt'));
+                console.log('🎯 DEBUG: fileAttachMode:', GM_getValue('fileAttachMode'));
 
-            console.log('🎯 DEBUG: Values set and input cleared, opening Eva...');
+                // Clear the input field after storing the query
+                input.value = '';
 
-            window.open('https://datacenteracademy.dco.aws.dev/assistant', '_blank');
+                console.log('🎯 DEBUG: Opening Eva page...');
+
+                // Try multiple Eva URLs in case one doesn't work
+                const evaUrls = [
+                    'https://datacenteracademy.dco.aws.dev/assistant',
+                    'https://eva.aws.dev/assistant',
+                    'https://eva.aws.dev'
+                ];
+
+                // Try the first URL, if it fails, try others
+                let opened = false;
+                for (const url of evaUrls) {
+                    try {
+                        window.open(url, '_blank');
+                        opened = true;
+                        console.log('🎯 DEBUG: Successfully opened:', url);
+                        break;
+                    } catch (e) {
+                        console.log('🎯 DEBUG: Failed to open:', url, e);
+                    }
+                }
+
+                if (!opened) {
+                    console.log('🎯 ERROR: Failed to open any Eva URL');
+                    // Restore the query to input if opening failed
+                    input.value = query;
+                }
+
+            } catch (error) {
+                console.log('🎯 ERROR in fastSearch:', error);
+                // Restore the query to input if there was an error
+                input.value = query;
+            }
         };
 
         attachBtn.onclick = (e) => { e.stopPropagation(); fastSearch(true); };
         input.onkeydown = (e) => { if (e.key === 'Enter') fastSearch(); };
-
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.shiftKey && e.key === 'E') {
-                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-                const resetX = Math.max(20, vw * 0.01);
-                const resetY = Math.max(20, vh * 0.02);
-                container.style.left = resetX + 'px';
-                container.style.top = resetY + 'px';
-                domainSpecificSavePos(resetX, resetY);
-            }
-        });
 
         // Update theme styles function
         const updateThemeStyles = (theme, zoom) => {
@@ -1277,18 +1315,20 @@
         return container;
     };
 
-    // FIXED WATCHDOG FUNCTION - NO MORE TEXT DELETION
+    // FIXED WATCHDOG FUNCTION - MUCH LESS AGGRESSIVE
     const fastWatchdog = () => setInterval(() => {
         const widget = document.getElementById('eva-search-box');
         const input = document.getElementById('eva-search-input');
 
-        // Don't recreate if user is actively typing
+        // Don't recreate if user is actively typing or if widget exists and is visible
         if (input && document.activeElement === input) {
             return;
         }
 
-        // Only recreate if widget is actually missing or broken
-        if (!widget || !document.contains(widget) || widget.offsetParent === null) {
+        // Only recreate if widget is actually missing or completely broken
+        if (!widget || !document.contains(widget)) {
+            console.log('🎯 Widget missing, recreating...');
+            
             // Save the current input value before recreating
             const savedValue = input ? input.value : '';
 
@@ -1301,12 +1341,11 @@
                     const newInput = newWidget.querySelector('#eva-search-input');
                     if (newInput) {
                         newInput.value = savedValue;
-                        newInput.focus();
                     }
-                }, 50);
+                }, 100);
             }
         }
-    }, 5000); // Changed from 2000 to 5000 (less aggressive)
+    }, 10000); // Changed from 5000 to 10000 (much less aggressive)
 
     const fastInit = () => {
         createFastWidget();
