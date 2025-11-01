@@ -2,49 +2,37 @@ Simply open the above file, then click the "Raw" tab above the script and the sc
 
 
 
-# 🎯 Eva Assistant Widget - Feature Summary
+🎯 Eva Assistant Widget - What It Does
 
-## **Core Functions**
-• **Quick Search Widget** - Floating search box on all web pages
-• **Direct Eva Integration** - Opens Eva AI assistant with your query pre-filled
-• **File Attachment Mode** - Special mode for attaching files to Eva queries
-• **Auto-Submit** - Automatically submits regular queries, waits for manual file attachment
+Main Purpose
 
-## **User Interface**
-• **Draggable Widget** - Move anywhere on screen, position saved per domain
-• **Minimize/Maximize** - Collapse to small icon or expand to full search box
-• **Theme System** - 4 built-in themes (Amazon Orange, Blue, Dark, Black & White)
-• **Global Theme Sync** - Theme changes apply across all browser tabs instantly
-• **Right-Click Menu** - Context menu for theme selection
+• Adds a search box to every webpage that connects directly to Eva AI
+• Type your question and hit Enter - Eva opens with your query ready to go
+• Attach files easily - Special button for file-based questions
 
-## **Smart Positioning**
-• **Domain-Specific Memory** - Remembers position and state for each website
-• **Zoom Resistant** - Automatically adjusts size based on browser zoom level
-• **Default Top-Center** - New sites start with widget at top center of page
-• **Viewport Boundaries** - Prevents widget from going off-screen
+How It Works
 
-## **Eva Page Automation**
-• **Auto-Paste Queries** - Automatically fills Eva's input field with your search
-• **Smart Typing Simulation** - Mimics human typing to trigger Eva's systems
-• **File Mode Indicators** - Highlights attachment button when in file mode
-• **Duplicate Prevention** - Prevents multiple submissions and page processing
+• Floating widget appears on all websites (like a sticky note)
+• Drag it anywhere you want - it remembers where you put it
+• Minimize when not needed - shrinks to a tiny icon
+• Right-click to change colors - 4 different themes to choose from
 
-## **Cross-Browser Compatibility**
-• **Universal Storage** - Works with Tampermonkey, Greasemonkey, or browser storage
-• **Firefox & Chrome Support** - Single script works on both browsers
-• **Popup Blocker Bypass** - Multiple methods to open Eva in new tabs
-• **Error Handling** - Graceful fallbacks for restricted environments
+Smart Features
 
-## **Technical Features**
-• **Domain Detection** - Different behavior on Eva pages vs other sites
-• **Storage Fallback System** - GM functions → localStorage → sessionStorage
-• **Event Handler Protection** - Prevents duplicate event listeners
-• **Performance Optimized** - Minimal resource usage, fast initialization
+• Remembers your preferences - position, size, and theme on each website
+• Works on both Firefox and Chrome - same script for both browsers
+• Bypasses popup blockers - always opens Eva in a new tab
+• Auto-fills your question - no need to retype when Eva opens
 
-## **Security & Reliability**
-• **Iframe Protection** - Doesn't run in ads or embedded frames
-• **Duplicate Script Protection** - Prevents multiple instances from running
-• **Safe DOM Manipulation** - Waits for page load, handles missing elements
-• **Error Recovery** - Continues working even if some features fail
+Two Modes
 
-**🎯 One Widget, All Pages, Instant Eva Access!**
+• 📝 Regular Mode: Type question → Hit Enter → Eva opens and submits automatically
+• 📎 File Mode: Type question → Click paperclip → Eva opens with file button highlighted
+
+Installation
+
+• Install Tampermonkey browser extension
+• Add this script
+• Widget appears on all websites instantly
+
+🎯 Bottom Line: Ask Eva from anywhere on the web with one click!
