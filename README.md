@@ -3,6 +3,8 @@ Simply open the above file, then click the "Raw" tab above the script and the sc
 
 
 
+
+
 🎯 Eva Assistant Widget - What It Does
 
 Main Purpose
