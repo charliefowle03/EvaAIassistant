@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Eva Assistant Widget (Always Top Center)
+// @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
 // @version      2.0
-// @description  Eva Widget - Always appears at top center of every page
+// @description  Eva Widget - Instantly use Eva from any page
 // @author       You
 // @match        *://*/*
 // @grant        GM_setValue
@@ -447,8 +447,8 @@
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const dimensions = getZoomResistantDimensions();
         const widgetWidth = dimensions.expanded.width;
-        
-        const topCenterPos = { 
+
+        const topCenterPos = {
             x: (vw - widgetWidth) / 2, // Center horizontally
             y: 20 // 20px from top
         };
@@ -503,35 +503,35 @@
             safeGM_setValue('cameFromWidget', true);
             safeGM_setValue('pendingEvaPrompt', query);
             safeGM_setValue('fileAttachMode', fileMode);
-            
+
             console.log('🎯 🌐 Opening Eva in NEW TAB...');
 
             const evaUrl = 'https://eva.aws.dev';
-            
+
             console.log('🎯 Trying simple window.open...');
             const newWindow = window.open(evaUrl, '_blank');
-            
+
             if (newWindow) {
                 console.log('🎯 ✅ Tab opened successfully');
                 setTimeout(() => { searchExecuting = false; }, 2000);
                 return true;
             }
-            
+
             console.log('🎯 Window.open blocked, trying link method...');
             const link = document.createElement('a');
             link.href = evaUrl;
             link.target = '_blank';
             link.style.display = 'none';
             document.body.appendChild(link);
-            
+
             link.click();
-            
+
             setTimeout(() => {
                 if (link.parentNode) {
                     document.body.removeChild(link);
                 }
             }, 100);
-            
+
             console.log('🎯 ✅ Link clicked - tab should open');
             setTimeout(() => { searchExecuting = false; }, 2000);
             return true;
@@ -902,14 +902,14 @@
             const currentMin = input.style.display === 'none';
             const newMin = !currentMin;
             const newDim = newMin ? dimensions.minimized : dimensions.expanded;
-            
+
             console.log('🎯 Toggling minimize from', currentMin, 'to', newMin);
-            
+
             // ALWAYS RECENTER WHEN TOGGLING
             const newPos = getTopCenterPosition();
             container.style.left = newPos.x + 'px';
             container.style.top = newPos.y + 'px';
-            
+
             if (newMin) {
                 input.style.display = 'none';
                 leftBtn.innerHTML = '◀';
@@ -924,7 +924,7 @@
                 inputContainer.style.justifyContent = 'space-between';
                 setTimeout(() => input.focus(), 100);
             }
-            
+
             saveMinimizedState(newMin);
             console.log('🎯 Minimized state saved and recentered:', newMin);
         };
@@ -985,7 +985,7 @@
     // INITIALIZATION
     const init = () => {
         console.log('🎯 Initialization starting...');
-        
+
         if (!document.body) {
             console.log('🎯 Body not ready, waiting...');
             setTimeout(init, 50);
@@ -993,13 +993,13 @@
         }
 
         const widget = createWidget();
-        
+
         if (widget) {
             console.log('🎯 Widget created successfully at TOP CENTER');
-            
+
             const currentTheme = themes[loadGlobalTheme()] || themes.default;
             updateThemeStyles(currentTheme, getZoomLevel());
-            
+
             // Handle window resize - ALWAYS RECENTER
             let resizeTimeout;
             window.addEventListener('resize', () => {
@@ -1011,7 +1011,7 @@
                     widget.style.top = pos.y + 'px';
                 }, 250);
             });
-            
+
             console.log('🎯 Initialization complete - FIXED TOP CENTER');
         } else {
             console.log('🎯 Widget creation failed');
@@ -1020,7 +1020,7 @@
 
     // START THE WIDGET
     console.log('🎯 Starting Eva Widget - ALWAYS TOP CENTER MODE');
-    
+
     if (document.readyState !== 'loading') {
         console.log('🎯 Document ready, initializing immediately');
         init();
