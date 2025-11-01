@@ -1,10 +1,13 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      1.5
-// @description  Eva Widget - Fixed Events & Top Center Position
+// @version      1.8
+// @description  Eva Widget - Fixed Multiple Tabs Issue
 // @author       You
 // @match        *://*/*
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_addStyle
 // @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
 // @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
 // ==/UserScript==
@@ -12,9 +15,60 @@
 (function() {
     'use strict';
 
+    // STORAGE FALLBACK WRAPPER - Only change GM calls to safe calls
+    const safeGM_setValue = (key, value) => {
+        try {
+            if (typeof GM_setValue !== 'undefined') {
+                GM_setValue(key, value);
+            } else {
+                localStorage.setItem('eva_gm_' + key, JSON.stringify(value));
+            }
+        } catch (e) {
+            try {
+                sessionStorage.setItem('eva_gm_' + key, JSON.stringify(value));
+            } catch (e2) {
+                console.log('🎯 ❌ Storage failed:', e2);
+            }
+        }
+    };
+
+    const safeGM_getValue = (key, defaultValue) => {
+        try {
+            if (typeof GM_getValue !== 'undefined') {
+                return GM_getValue(key, defaultValue);
+            } else {
+                const stored = localStorage.getItem('eva_gm_' + key);
+                return stored !== null ? JSON.parse(stored) : defaultValue;
+            }
+        } catch (e) {
+            try {
+                const stored = sessionStorage.getItem('eva_gm_' + key);
+                return stored !== null ? JSON.parse(stored) : defaultValue;
+            } catch (e2) {
+                return defaultValue;
+            }
+        }
+    };
+
+    const safeGM_addStyle = (css) => {
+        try {
+            if (typeof GM_addStyle !== 'undefined') {
+                GM_addStyle(css);
+            } else {
+                const style = document.createElement('style');
+                style.textContent = css;
+                document.head.appendChild(style);
+            }
+        } catch (e) {
+            console.log('🎯 ❌ Style injection failed:', e);
+        }
+    };
+
     // Add debugging for storage availability
     console.log('🎯 DEBUG: GM_setValue available:', typeof GM_setValue !== 'undefined');
     console.log('🎯 DEBUG: GM_getValue available:', typeof GM_getValue !== 'undefined');
+    console.log('🎯 DEBUG: localStorage available:', typeof localStorage !== 'undefined');
+    console.log('🎯 DEBUG: sessionStorage available:', typeof sessionStorage !== 'undefined');
 
     // ULTIMATE PROTECTION - CHECK IMMEDIATELY
     if (window.evaWidgetRan || window.EVA_SCRIPT_LOADED) {
@@ -103,12 +157,12 @@
         }
     };
 
-    // GLOBAL THEME MANAGEMENT
+    // GLOBAL THEME MANAGEMENT - USING SAFE FUNCTIONS
     const saveGlobalTheme = (themeName) => {
         try {
-            GM_setValue('evaWidgetGlobalTheme', themeName);
-            GM_setValue('evaWidgetGlobalThemeBackup', themeName);
-            GM_setValue('evaWidgetThemeTimestamp', Date.now());
+            safeGM_setValue('evaWidgetGlobalTheme', themeName);
+            safeGM_setValue('evaWidgetGlobalThemeBackup', themeName);
+            safeGM_setValue('evaWidgetThemeTimestamp', Date.now());
             console.log('🎯 Global theme saved:', themeName);
             broadcastThemeChange(themeName);
         } catch (e) {
@@ -118,8 +172,8 @@
 
     const loadGlobalTheme = () => {
         try {
-            const savedTheme = GM_getValue('evaWidgetGlobalTheme', 'default') ||
-                              GM_getValue('evaWidgetGlobalThemeBackup', 'default');
+            const savedTheme = safeGM_getValue('evaWidgetGlobalTheme', 'default') ||
+                              safeGM_getValue('evaWidgetGlobalThemeBackup', 'default');
             console.log('🎯 Global theme loaded:', savedTheme);
             return savedTheme;
         } catch (e) {
@@ -130,7 +184,7 @@
 
     const broadcastThemeChange = (themeName) => {
         try {
-            GM_setValue('evaWidgetThemeBroadcast', JSON.stringify({
+            safeGM_setValue('evaWidgetThemeBroadcast', JSON.stringify({
                 theme: themeName,
                 timestamp: Date.now(),
                 source: window.location.href
@@ -146,7 +200,7 @@
 
         const checkForThemeUpdates = () => {
             try {
-                const broadcastData = GM_getValue('evaWidgetThemeBroadcast', '');
+                const broadcastData = safeGM_getValue('evaWidgetThemeBroadcast', '');
                 if (broadcastData) {
                     const data = JSON.parse(broadcastData);
                     if (data.timestamp > lastBroadcastTimestamp && data.source !== window.location.href) {
@@ -190,17 +244,17 @@
 
         console.log('🎯 DEBUG: ALL PROTECTION FLAGS SET');
 
-        const storedPrompt = GM_getValue('pendingEvaPrompt', '');
-        const isFileMode = GM_getValue('fileAttachMode', false);
-        const cameFromWidget = GM_getValue('cameFromWidget', false);
+        const storedPrompt = safeGM_getValue('pendingEvaPrompt', '');
+        const isFileMode = safeGM_getValue('fileAttachMode', false);
+        const cameFromWidget = safeGM_getValue('cameFromWidget', false);
 
         console.log('🎯 DEBUG: storedPrompt:', storedPrompt);
         console.log('🎯 DEBUG: isFileMode:', isFileMode);
         console.log('🎯 DEBUG: cameFromWidget:', cameFromWidget);
 
-        GM_setValue('pendingEvaPrompt', '');
-        GM_setValue('fileAttachMode', false);
-        GM_setValue('cameFromWidget', false);
+        safeGM_setValue('pendingEvaPrompt', '');
+        safeGM_setValue('fileAttachMode', false);
+        safeGM_setValue('cameFromWidget', false);
         console.log('🎯 DEBUG: Values cleared immediately to prevent duplicates');
 
         if (!cameFromWidget && !storedPrompt && !isFileMode) {
@@ -330,7 +384,7 @@
         const addAttachmentGlow = () => {
             console.log('🎯 File mode - adding attachment button glow');
 
-            GM_addStyle(`
+            safeGM_addStyle(`
                 @keyframes fastPulse {
                     0%, 100% { border: 3px solid rgba(255, 153, 0, 0.3); box-shadow: 0 0 5px rgba(255, 153, 0, 0.4); }
                     50% { border: 3px solid rgba(255, 153, 0, 1); box-shadow: 0 0 15px rgba(255, 153, 0, 0.9); }
@@ -482,9 +536,9 @@
             const backupKey = getDomainKey('evaWidgetPositionBackup');
             const backup2Key = getDomainKey('evaWidgetPositionBackup2');
 
-            GM_setValue(posKey, JSON.stringify(data));
-            GM_setValue(backupKey, JSON.stringify(data));
-            GM_setValue(backup2Key, JSON.stringify(data));
+            safeGM_setValue(posKey, JSON.stringify(data));
+            safeGM_setValue(backupKey, JSON.stringify(data));
+            safeGM_setValue(backup2Key, JSON.stringify(data));
 
             console.log('🎯 Position saved for domain:', window.location.hostname, 'at:', data);
         } catch (e) {
@@ -499,9 +553,9 @@
             const backupKey = getDomainKey('evaWidgetPositionBackup');
             const backup2Key = getDomainKey('evaWidgetPositionBackup2');
 
-            const saved = GM_getValue(posKey, '') ||
-                         GM_getValue(backupKey, '') ||
-                         GM_getValue(backup2Key, '');
+            const saved = safeGM_getValue(posKey, '') ||
+                         safeGM_getValue(backupKey, '') ||
+                         safeGM_getValue(backup2Key, '');
 
             if (saved) {
                 const pos = JSON.parse(saved);
@@ -533,8 +587,8 @@
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const dimensions = getZoomResistantDimensions();
         const widgetWidth = dimensions.expanded.width;
-        
-        const defaultPos = { 
+
+        const defaultPos = {
             x: (vw - widgetWidth) / 2, // Center horizontally
             y: 20 // 20px from top
         };
@@ -547,8 +601,8 @@
             const minKey = getDomainKey('evaWidgetMinimized');
             const minBackupKey = getDomainKey('evaWidgetMinimizedBackup');
 
-            GM_setValue(minKey, min);
-            GM_setValue(minBackupKey, min);
+            safeGM_setValue(minKey, min);
+            safeGM_setValue(minBackupKey, min);
             console.log('🎯 Minimized state saved for domain:', window.location.hostname, ':', min);
         } catch (e) {
             console.log('🎯 Domain-specific min save failed:', e);
@@ -560,7 +614,7 @@
             const minKey = getDomainKey('evaWidgetMinimized');
             const minBackupKey = getDomainKey('evaWidgetMinimizedBackup');
 
-            const min = GM_getValue(minKey, false) || GM_getValue(minBackupKey, false);
+            const min = safeGM_getValue(minKey, false) || safeGM_getValue(minBackupKey, false);
             console.log('🎯 Minimized state loaded for domain:', window.location.hostname, ':', min);
             return min;
         } catch (e) {
@@ -603,8 +657,16 @@
         });
     };
 
-    // GLOBAL SEARCH FUNCTION - COMPLETELY REWRITTEN FOR RELIABILITY
+               // GLOBAL SEARCH FUNCTION - SIMPLE NEW TAB (COMPATIBILITY FIXED)
+    let searchExecuting = false;
+
     const performSearch = (query, fileMode = false) => {
+        if (searchExecuting) {
+            console.log('🎯 🚫 DUPLICATE SEARCH BLOCKED - already executing');
+            return false;
+        }
+
+        searchExecuting = true;
         console.log('🎯 🚀 SEARCH FUNCTION CALLED!');
         console.log('🎯 Query:', query);
         console.log('🎯 File Mode:', fileMode);
@@ -612,61 +674,56 @@
         // Don't proceed if no query and not in file mode
         if (!query && !fileMode) {
             console.log('🎯 ❌ No query provided and not file mode, aborting');
+            searchExecuting = false;
             alert('Please enter a query or use attach mode');
             return false;
         }
 
         try {
             console.log('🎯 💾 Setting GM values...');
-            GM_setValue('cameFromWidget', true);
-            GM_setValue('pendingEvaPrompt', query);
-            GM_setValue('fileAttachMode', fileMode);
-            
-            // Verify the values were set
-            const verification = {
-                cameFromWidget: GM_getValue('cameFromWidget'),
-                pendingEvaPrompt: GM_getValue('pendingEvaPrompt'),
-                fileAttachMode: GM_getValue('fileAttachMode')
-            };
-            console.log('🎯 ✅ Values verification:', verification);
+            safeGM_setValue('cameFromWidget', true);
+            safeGM_setValue('pendingEvaPrompt', query);
+            safeGM_setValue('fileAttachMode', fileMode);
 
-            console.log('🎯 🌐 Opening Eva page...');
+            console.log('🎯 🌐 Opening Eva in NEW TAB...');
 
-            // Try multiple Eva URLs
-            const evaUrls = [
-                'https://datacenteracademy.dco.aws.dev/assistant',
-                'https://eva.aws.dev/assistant',
-                'https://eva.aws.dev'
-            ];
+            const evaUrl = 'https://eva.aws.dev';
 
-            let opened = false;
-            for (const url of evaUrls) {
-                try {
-                    console.log('🎯 🔗 Trying to open:', url);
-                    const newWindow = window.open(url, '_blank', 'noopener,noreferrer');
-                    if (newWindow && !newWindow.closed) {
-                        opened = true;
-                        console.log('🎯 ✅ Successfully opened:', url);
-                        break;
-                    } else {
-                        console.log('🎯 ❌ Failed to open or was blocked:', url);
-                    }
-                } catch (e) {
-                    console.log('🎯 ❌ Exception opening:', url, e);
+            // Method 1: Simple window.open
+            console.log('🎯 Trying simple window.open...');
+            const newWindow = window.open(evaUrl, '_blank');
+
+            if (newWindow) {
+                console.log('🎯 ✅ Tab opened successfully');
+                setTimeout(() => { searchExecuting = false; }, 2000);
+                return true;
+            }
+
+            // Method 2: If blocked, create and click link (simple version)
+            console.log('🎯 Window.open blocked, trying link method...');
+            const link = document.createElement('a');
+            link.href = evaUrl;
+            link.target = '_blank';
+            link.style.display = 'none';
+            document.body.appendChild(link);
+
+            // Simple click - no complex MouseEvent
+            link.click();
+
+            // Clean up
+            setTimeout(() => {
+                if (link.parentNode) {
+                    document.body.removeChild(link);
                 }
-            }
+            }, 100);
 
-            if (!opened) {
-                console.log('🎯 ❌ Failed to open any Eva URL - popup blocked?');
-                alert('Failed to open Eva. Please check if popups are blocked.');
-                return false;
-            }
-
-            console.log('🎯 ✅ Search function completed successfully');
+            console.log('🎯 ✅ Link clicked - tab should open');
+            setTimeout(() => { searchExecuting = false; }, 2000);
             return true;
 
         } catch (error) {
             console.log('🎯 ❌ ERROR in performSearch:', error);
+            searchExecuting = false;
             alert('Error occurred: ' + error.message);
             return false;
         }
@@ -1036,334 +1093,201 @@
 
         listenForThemeChanges(applyTheme);
 
-        const fastEscape = () => {
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey && e.shiftKey && e.key === 'E') {
-                    // Reset to top center
-                    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                    const resetX = (vw - currentDim.width) / 2;
-                    const resetY = 20;
-                    container.style.left = resetX + 'px';
-                    container.style.top = resetY + 'px';
-                    domainSpecificSavePos(resetX, resetY);
-                    console.log('🎯 Position manually reset to TOP CENTER via Ctrl+Shift+E');
-                }
-            });
-        };
+        // SINGLE CONSOLIDATED EVENT HANDLER - NO DUPLICATES
+        console.log('🎯 Setting up SINGLE event handler...');
 
-        const fastToggleMin = () => {
-            const currentMin = input.style.display === 'none';
-            const newMin = !currentMin;
-            const newDimensions = getZoomResistantDimensions();
-            const newDim = newMin ? newDimensions.minimized : newDimensions.expanded;
-            const newZoom = newDimensions.zoom;
+        let searchInProgress = false; // Prevent multiple simultaneous searches
 
-            if (newMin) {
-                input.style.display = 'none';
-                container.style.width = newDim.width + 'px';
-                container.style.padding = (4/newZoom) + 'px ' + (3/newZoom) + 'px';
-                inputContainer.style.justifyContent = 'center';
-                leftBtn.innerHTML = '◀';
-                rightBtn.innerHTML = '▶';
-                container.classList.add('eva-minimized-pulse');
-            } else {
-                input.style.display = 'block';
-                input.style.width = (newDim.width - 50/newZoom) + 'px';
-                container.style.width = newDim.width + 'px';
-                container.style.padding = (4/newZoom) + 'px ' + (5/newZoom) + 'px';
-                inputContainer.style.justifyContent = 'space-between';
-                leftBtn.innerHTML = '▶';
-                rightBtn.innerHTML = '◀';
-                container.classList.remove('eva-minimized-pulse');
-
-                const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-                const rect = container.getBoundingClientRect();
-                if (rect.right > vw) container.style.left = (vw - newDim.width - 10) + 'px';
-                if (rect.left < 0) container.style.left = '10px';
-                if (rect.bottom > vh) container.style.top = (vh - newDim.height - 10) + 'px';
-                if (rect.top < 0) container.style.top = '10px';
-
-                domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
+        const handleSearch = (query, fileMode = false) => {
+            if (searchInProgress) {
+                console.log('🎯 🚫 Search already in progress, ignoring duplicate');
+                return false;
             }
-            domainSpecificSaveMin(newMin);
-        };
 
-        leftBtn.onclick = rightBtn.onclick = (e) => { e.stopPropagation(); fastToggleMin(); };
+            searchInProgress = true;
+            console.log('🎯 🚀 SINGLE SEARCH HANDLER:', fileMode ? 'FILE MODE' : 'REGULAR MODE', 'Query:', query);
 
-        // COMPLETELY REWRITTEN EVENT HANDLERS WITH MULTIPLE APPROACHES
-        console.log('🎯 Setting up event handlers...');
-
-        // Method 1: Direct event listeners with capture
-        attachBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            console.log('🎯 🖱️ ATTACH BUTTON CLICKED! (Method 1)');
-            const query = input.value.trim();
-            const success = performSearch(query, true);
+            const success = performSearch(query, fileMode);
             if (success) {
                 input.value = '';
             }
-        }, true); // Use capture phase
 
-        // Method 2: Mouse events for attach button
-        attachBtn.addEventListener('mousedown', (e) => {
-            console.log('🎯 🖱️ ATTACH BUTTON MOUSEDOWN!');
-        });
+            // Reset flag after a delay
+            setTimeout(() => {
+                searchInProgress = false;
+            }, 1000);
 
-        attachBtn.addEventListener('mouseup', (e) => {
-            console.log('🎯 🖱️ ATTACH BUTTON MOUSEUP!');
-        });
+            return success;
+        };
 
-        // Method 3: Multiple event types for input
+        // Method 1: Attach button click
+        attachBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🎯 🖱️ ATTACH BUTTON CLICKED!');
+            const query = input.value.trim();
+            handleSearch(query, true);
+        }, { once: false, passive: false });
+
+        // Method 2: ONLY ONE Enter key handler
         input.addEventListener('keydown', (e) => {
-            console.log('🎯 ⌨️ KEY PRESSED:', e.key, e.code);
-            if (e.key === 'Enter' || e.code === 'Enter') {
+            if (e.key === 'Enter') {
                 e.preventDefault();
                 e.stopPropagation();
-                e.stopImmediatePropagation();
-                console.log('🎯 ⌨️ ENTER KEY DETECTED! (Method 1)');
+                console.log('🎯 ⌨️ ENTER KEY - SINGLE HANDLER');
                 const query = input.value.trim();
-                const success = performSearch(query, false);
-                if (success) {
-                    input.value = '';
-                }
+                handleSearch(query, false);
             }
-        }, true); // Use capture phase
+        }, { once: false, passive: false });
 
-        // Method 4: Alternative keypress handler
-        input.addEventListener('keypress', (e) => {
-            console.log('🎯 ⌨️ KEYPRESS:', e.key, e.code);
-            if (e.key === 'Enter' || e.code === 'Enter') {
-                e.preventDefault();
-                console.log('🎯 ⌨️ ENTER KEY DETECTED! (Method 2)');
-                const query = input.value.trim();
-                performSearch(query, false);
-            }
-        });
-
-        // Method 5: Form submission handler (create a form wrapper)
+        // Method 3: Form wrapper (but prevent default submission)
         const form = document.createElement('form');
         form.style.cssText = 'margin: 0; padding: 0; display: contents;';
         form.addEventListener('submit', (e) => {
             e.preventDefault();
-            console.log('🎯 📝 FORM SUBMITTED!');
-            const query = input.value.trim();
-            const success = performSearch(query, false);
-            if (success) {
-                input.value = '';
+            e.stopPropagation();
+            console.log('🎯 📝 FORM SUBMIT PREVENTED - using keydown handler instead');
+            // Don't call handleSearch here - let the keydown handler do it
+        }, { once: false, passive: false });
+
+        const toggleMinimize = () => {
+            const currentMin = input.style.display === 'none';
+            const newMin = !currentMin;
+            const newDim = newMin ? dimensions.minimized : dimensions.expanded;
+
+            console.log('🎯 Toggling minimize from', currentMin, 'to', newMin);
+
+            if (newMin) {
+                input.style.display = 'none';
+                leftBtn.innerHTML = '◀';
+                rightBtn.innerHTML = '▶';
+                container.style.width = newDim.width + 'px';
+                inputContainer.style.justifyContent = 'center';
+            } else {
+                input.style.display = 'block';
+                leftBtn.innerHTML = '▶';
+                rightBtn.innerHTML = '◀';
+                container.style.width = newDim.width + 'px';
+                inputContainer.style.justifyContent = 'space-between';
+                setTimeout(() => input.focus(), 100);
             }
-        });
 
-        // Method 6: Global document event listeners
-        document.addEventListener('keydown', (e) => {
-            if (document.activeElement === input && (e.key === 'Enter' || e.code === 'Enter')) {
-                e.preventDefault();
-                console.log('🎯 ⌨️ GLOBAL ENTER DETECTED!');
-                const query = input.value.trim();
-                performSearch(query, false);
-            }
-        });
-
-        // Method 7: Focus and blur handlers for debugging
-        input.addEventListener('focus', () => {
-            console.log('🎯 🎯 INPUT FOCUSED');
-        });
-
-        input.addEventListener('blur', () => {
-            console.log('🎯 🎯 INPUT BLURRED');
-        });
-
-        // Method 8: Input change handlers
-        input.addEventListener('input', () => {
-            console.log('🎯 📝 INPUT CHANGED:', input.value);
-        });
-
-        console.log('🎯 ✅ All event handlers set up');
-
-        const updateThemeStyles = (theme, zoom) => {
-            const existingStyle = document.querySelector('style[data-eva-theme-styles]');
-            if (existingStyle) existingStyle.remove();
-
-            const style = document.createElement('style');
-            style.setAttribute('data-eva-theme-styles', 'true');
-            style.textContent = `
-                #eva-search-input::placeholder{color:${theme.inputPlaceholder}!important;opacity:1!important}
-                #eva-search-input:focus{outline:none!important;box-shadow:0 0 0 ${1/zoom}px ${theme.focusColor}!important}
-
-                #eva-search-box * {
-                    transform: scale(1) !important;
-                    transform-origin: top left !important;
-                }
-
-                @keyframes minimizedPulse {
-                    0%, 100% {
-                        border-color: ${theme.border} !important;
-                        box-shadow: 0 ${2/zoom}px ${6/zoom}px rgba(0,0,0,0.2), 0 0 0 0 ${theme.pulseColor.replace('0.6', '0.4')} !important;
-                    }
-                    50% {
-                        border-color: ${theme.borderHover} !important;
-                        box-shadow: 0 ${2/zoom}px ${6/zoom}px rgba(0,0,0,0.2), 0 0 0 ${4/zoom}px ${theme.pulseColor} !important;
-                    }
-                }
-
-                .eva-minimized-pulse {
-                    animation: minimizedPulse 2s ease-in-out infinite !important;
-                }
-            `;
-            document.head.appendChild(style);
+            domainSpecificSaveMin(newMin);
+            console.log('🎯 Minimized state saved:', newMin);
         };
 
-        updateThemeStyles(currentTheme, zoom);
+        leftBtn.onclick = rightBtn.onclick = (e) => {
+            e.stopPropagation();
+            toggleMinimize();
+        };
 
-        // Wrap input in form for better form handling
+        // Assembly
         form.appendChild(input);
-        inputContainer.append(form, attachBtn);
-        container.append(inputContainer, leftBtn, rightBtn);
+        inputContainer.appendChild(form);
+        inputContainer.appendChild(attachBtn);
+        container.appendChild(inputContainer);
+        container.appendChild(leftBtn);
+        container.appendChild(rightBtn);
 
-        if (isMin) {
-            container.classList.add('eva-minimized-pulse');
-        }
+        // Make draggable
+        fastDraggable(container, ['input', 'div[class*="minimize"]', 'svg', 'path', 'form']);
 
         document.body.appendChild(container);
-        evaWidget = container;
 
-        fastDraggable(container, ['input', 'svg', '.eva-minimize-button', 'form']);
-        fastEscape();
-
-        // Focus the input for immediate use
-        setTimeout(() => {
-            if (!isMin) {
-                input.focus();
-                console.log('🎯 🎯 Input focused for immediate use');
-            }
-        }, 100);
-
-        // Handle window resize and zoom changes (keeping existing resize handler)
-        const handleResize = () => {
+        // Auto-focus if not minimized
+        if (!isMin) {
             setTimeout(() => {
-                const newDimensions = getZoomResistantDimensions();
-                const currentMin = input.style.display === 'none';
-                const newDim = currentMin ? newDimensions.minimized : newDimensions.expanded;
-                const newZoom = newDimensions.zoom;
-                const theme = themes[loadGlobalTheme()] || themes.default;
-
-                container.style.width = newDim.width + 'px';
-                container.style.height = newDim.height + 'px';
-                container.style.border = (2/newZoom) + 'px solid ' + theme.border;
-                container.style.borderRadius = (4/newZoom) + 'px';
-                container.style.fontSize = (14/newZoom) + 'px';
-                container.style.padding = currentMin ?
-                    (4/newZoom) + 'px ' + (3/newZoom) + 'px' :
-                    (4/newZoom) + 'px ' + (5/newZoom) + 'px';
-
-                inputContainer.style.gap = (2/newZoom) + 'px';
-                inputContainer.style.height = (newDim.height - 8/newZoom) + 'px';
-
-                if (!currentMin) {
-                    input.style.width = (newDim.width - 50/newZoom) + 'px';
-                    input.style.height = Math.max(22/newZoom, newDim.height * 0.6) + 'px';
-                    input.style.padding = '0 ' + (6/newZoom) + 'px';
-                    input.style.borderRadius = (3/newZoom) + 'px';
-                    input.style.fontSize = Math.max(11/newZoom, newDim.height * 0.3) + 'px';
-                    input.style.lineHeight = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
+                try {
+                    input.focus();
+                    console.log('🎯 Input focused successfully');
+                } catch (e) {
+                    console.log('🎯 Input focus failed:', e);
                 }
-
-                const newSvgSize = Math.max(16/newZoom, newDim.height * 0.44);
-                const svg = attachBtn.querySelector('svg');
-                if (svg) {
-                    svg.setAttribute('width', newSvgSize + 'px');
-                    svg.setAttribute('height', newSvgSize + 'px');
-                    svg.querySelector('path').setAttribute('stroke-width', (2/newZoom).toString());
-                }
-                attachBtn.style.width = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
-                attachBtn.style.height = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
-                attachBtn.style.padding = (2/newZoom) + 'px';
-                attachBtn.style.borderRadius = (3/newZoom) + 'px';
-
-                [leftBtn, rightBtn].forEach((btn, index) => {
-                    const side = index === 0 ? 'left' : 'right';
-                    btn.style[side] = (-10/newZoom) + 'px';
-                    btn.style.width = (10/newZoom) + 'px';
-                    btn.style.height = Math.max(20/newZoom, newDim.height * 0.55) + 'px';
-                    btn.style.fontSize = Math.max(7/newZoom, newDim.height * 0.19) + 'px';
-                    btn.style.border = (1/newZoom) + 'px solid ' + theme.borderHover;
-                    btn.style.borderRadius = side === 'left' ?
-                        (3/newZoom) + 'px 0 0 ' + (3/newZoom) + 'px' :
-                        '0 ' + (3/newZoom) + 'px ' + (3/newZoom) + 'px 0';
-                });
-
-                updateThemeStyles(theme, newZoom);
-
-                domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
-                console.log('🎯 Widget resized for domain:', window.location.hostname, 'zoom:', newZoom);
             }, 100);
-        };
+        }
 
-        window.addEventListener('resize', handleResize);
-
-        let currentZoom = getZoomLevel();
-        setInterval(() => {
-            const newZoom = getZoomLevel();
-            if (Math.abs(newZoom - currentZoom) > 0.1) {
-                currentZoom = newZoom;
-                console.log('🎯 Zoom change detected:', newZoom);
-                handleResize();
-            }
-        }, 500);
-
-        window.addEventListener('beforeunload', () => {
-            domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
-            console.log('🎯 Position saved on page unload for domain:', window.location.hostname);
-        });
-
-        window.addEventListener('pagehide', () => {
-            domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
-            console.log('🎯 Position saved on page hide for domain:', window.location.hostname);
-        });
-
-        setInterval(() => {
-            domainSpecificSavePos(parseInt(container.style.left) || 0, parseInt(container.style.top) || 0);
-        }, 2000);
-
+        console.log('🎯 Widget created successfully for domain:', window.location.hostname);
         return container;
     };
 
-    const fastWatchdog = () => setInterval(() => {
-        const widget = document.getElementById('eva-search-box');
-        const input = document.getElementById('eva-search-input');
+    const updateThemeStyles = (theme, zoom) => {
+        safeGM_addStyle(`
+            #eva-search-input::placeholder {
+                color: ${theme.inputPlaceholder} !important;
+                opacity: 0.7 !important;
+            }
+            #eva-search-input:focus {
+                outline: ${2/zoom}px solid ${theme.focusColor} !important;
+                box-shadow: 0 0 ${4/zoom}px ${theme.focusColor} !important;
+            }
+            #eva-search-box:hover {
+                border-color: ${theme.borderHover} !important;
+            }
+            .eva-minimize-button:hover {
+                background-color: ${theme.buttonHover} !important;
+            }
+        `);
+    };
 
-        if (input && document.activeElement === input) {
+    // INITIALIZATION
+    const fastInit = () => {
+        console.log('🎯 Fast initialization starting...');
+
+        // Wait for body to be available
+        if (!document.body) {
+            console.log('🎯 Body not ready, waiting...');
+            setTimeout(fastInit, 50);
             return;
         }
 
-        if (!widget || !document.contains(widget)) {
-            console.log('🎯 Widget missing, recreating...');
-            
-            const savedValue = input ? input.value : '';
+        // Create the widget
+        const widget = createFastWidget();
 
-            if (widget) widget.remove();
-            const newWidget = createFastWidget();
+        if (widget) {
+            console.log('🎯 Widget created successfully');
 
-            if (savedValue && newWidget) {
-                setTimeout(() => {
-                    const newInput = newWidget.querySelector('#eva-search-input');
-                    if (newInput) {
-                        newInput.value = savedValue;
-                    }
-                }, 100);
-            }
+            // Apply initial theme
+            const currentTheme = themes[loadGlobalTheme()] || themes.default;
+            updateThemeStyles(currentTheme, getZoomLevel());
+
+            // Handle window resize
+            let resizeTimeout;
+            window.addEventListener('resize', () => {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    console.log('🎯 Window resized, updating widget position');
+                    const pos = domainSpecificLoadPos();
+                    widget.style.left = pos.x + 'px';
+                    widget.style.top = pos.y + 'px';
+                }, 250);
+            });
+
+            console.log('🎯 Initialization complete');
+        } else {
+            console.log('🎯 Widget creation failed');
         }
-    }, 10000);
-
-    const fastInit = () => {
-        createFastWidget();
-        setTimeout(fastWatchdog, 1000);
     };
 
-    if (document.readyState !== 'loading') fastInit();
-    else document.addEventListener('DOMContentLoaded', fastInit);
+    // START THE WIDGET
+    console.log('🎯 Starting Eva Widget initialization...');
 
-    [50, 200, 500, 1000].forEach(delay => setTimeout(createFastWidget, delay));
+    if (document.readyState !== 'loading') {
+        console.log('🎯 Document ready, initializing immediately');
+        fastInit();
+    } else {
+        console.log('🎯 Document loading, waiting for DOMContentLoaded');
+        document.addEventListener('DOMContentLoaded', fastInit);
+    }
+
+    // Backup initialization
+    setTimeout(() => {
+        console.log('🎯 Backup initialization check...');
+        if (!document.getElementById('eva-search-box')) {
+            console.log('🎯 Widget not found, creating via backup method');
+            createFastWidget();
+        }
+    }, 100);
+
+    console.log('🎯 Eva Widget script loaded successfully');
+
 })();
