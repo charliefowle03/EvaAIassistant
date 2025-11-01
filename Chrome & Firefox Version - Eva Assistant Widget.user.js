@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Eva Assistant Widget
+// @name         Eva Assistant Widget (Always Top Center)
 // @namespace    http://tampermonkey.net/
-// @version      1.8
-// @description  Eva Widget - Fixed Multiple Tabs Issue
+// @version      2.0
+// @description  Eva Widget - Always appears at top center of every page
 // @author       You
 // @match        *://*/*
 // @grant        GM_setValue
@@ -15,7 +15,7 @@
 (function() {
     'use strict';
 
-    // STORAGE FALLBACK WRAPPER - Only change GM calls to safe calls
+    // STORAGE FALLBACK WRAPPER
     const safeGM_setValue = (key, value) => {
         try {
             if (typeof GM_setValue !== 'undefined') {
@@ -64,12 +64,6 @@
         }
     };
 
-    // Add debugging for storage availability
-    console.log('🎯 DEBUG: GM_setValue available:', typeof GM_setValue !== 'undefined');
-    console.log('🎯 DEBUG: GM_getValue available:', typeof GM_getValue !== 'undefined');
-    console.log('🎯 DEBUG: localStorage available:', typeof localStorage !== 'undefined');
-    console.log('🎯 DEBUG: sessionStorage available:', typeof sessionStorage !== 'undefined');
-
     // ULTIMATE PROTECTION - CHECK IMMEDIATELY
     if (window.evaWidgetRan || window.EVA_SCRIPT_LOADED) {
         console.log('🎯 ULTIMATE PROTECTION: Script already ran - BLOCKING');
@@ -82,15 +76,6 @@
     if (window !== window.top) {
         console.log('🎯 Eva widget: Skipping iframe/ad window');
         return;
-    }
-
-    // Fix page loading at bottom - scroll to top on load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(() => window.scrollTo(0, 0), 50);
-        });
-    } else {
-        setTimeout(() => window.scrollTo(0, 0), 50);
     }
 
     // THEME DEFINITIONS
@@ -157,12 +142,10 @@
         }
     };
 
-    // GLOBAL THEME MANAGEMENT - USING SAFE FUNCTIONS
+    // GLOBAL THEME MANAGEMENT
     const saveGlobalTheme = (themeName) => {
         try {
             safeGM_setValue('evaWidgetGlobalTheme', themeName);
-            safeGM_setValue('evaWidgetGlobalThemeBackup', themeName);
-            safeGM_setValue('evaWidgetThemeTimestamp', Date.now());
             console.log('🎯 Global theme saved:', themeName);
             broadcastThemeChange(themeName);
         } catch (e) {
@@ -172,8 +155,7 @@
 
     const loadGlobalTheme = () => {
         try {
-            const savedTheme = safeGM_getValue('evaWidgetGlobalTheme', 'default') ||
-                              safeGM_getValue('evaWidgetGlobalThemeBackup', 'default');
+            const savedTheme = safeGM_getValue('evaWidgetGlobalTheme', 'default');
             console.log('🎯 Global theme loaded:', savedTheme);
             return savedTheme;
         } catch (e) {
@@ -242,8 +224,6 @@
         marker.style.display = 'none';
         document.body.appendChild(marker);
 
-        console.log('🎯 DEBUG: ALL PROTECTION FLAGS SET');
-
         const storedPrompt = safeGM_getValue('pendingEvaPrompt', '');
         const isFileMode = safeGM_getValue('fileAttachMode', false);
         const cameFromWidget = safeGM_getValue('cameFromWidget', false);
@@ -255,7 +235,6 @@
         safeGM_setValue('pendingEvaPrompt', '');
         safeGM_setValue('fileAttachMode', false);
         safeGM_setValue('cameFromWidget', false);
-        console.log('🎯 DEBUG: Values cleared immediately to prevent duplicates');
 
         if (!cameFromWidget && !storedPrompt && !isFileMode) {
             console.log('🎯 DEBUG: No conditions met for processing - exiting');
@@ -281,12 +260,8 @@
                 input.value = text;
 
                 const events = [
-                    new CompositionEvent('compositionstart', { bubbles: true }),
                     new Event('input', { bubbles: true, cancelable: true, composed: true }),
-                    new CompositionEvent('compositionend', { bubbles: true, data: text }),
                     new Event('change', { bubbles: true, cancelable: true }),
-                    new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter' }),
-                    new KeyboardEvent('keyup', { bubbles: true, key: 'Enter', code: 'Enter' })
                 ];
 
                 for (let i = 0; i < events.length; i++) {
@@ -296,29 +271,7 @@
                     }
                 }
 
-                try {
-                    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                    const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-
-                    if (input.tagName === 'INPUT') {
-                        nativeInputValueSetter.call(input, text);
-                    } else if (input.tagName === 'TEXTAREA') {
-                        nativeTextAreaValueSetter.call(input, text);
-                    }
-
-                    input.dispatchEvent(new Event('input', { bubbles: true }));
-                } catch (e) {
-                    console.log('🎯 Native setter failed, continuing anyway');
-                }
-
                 console.log('🎯 BALANCED TYPING COMPLETED');
-
-                setTimeout(() => {
-                    const submitBtn = document.querySelector('button[data-testid="submit-follow-up-prompt"]') ||
-                                     document.querySelector('button[type="submit"]');
-                    console.log('🎯 DEBUG: Submit button after typing - exists:', !!submitBtn, 'disabled:', submitBtn?.disabled);
-                }, 200);
-
                 return true;
 
             } catch (error) {
@@ -339,10 +292,6 @@
                                      document.querySelector('button[aria-label*="Send"]') ||
                                      document.querySelector('button[aria-label*="Submit"]') ||
                                      document.querySelector('form button:not([disabled])');
-
-                    if (attempts % 8 === 0) {
-                        console.log('🎯 DEBUG: Button check attempt', attempts + 1, '- Found:', !!submitBtn, 'Disabled:', submitBtn?.disabled);
-                    }
 
                     if (submitBtn && !submitBtn.disabled) {
                         console.log('🎯 DEBUG: Submit button is enabled after', attempts + 1, 'attempts!');
@@ -394,26 +343,11 @@
 
             const findAttachButton = () => {
                 const allButtons = document.querySelectorAll('button');
-                console.log('🎯 DEBUG: Found', allButtons.length, 'buttons total');
-
                 if (allButtons.length > 5) {
                     const button5 = allButtons[5];
-                    console.log('🎯 DEBUG: Button 6 text:', button5.textContent?.trim());
-                    console.log('🎯 DEBUG: Button 6 aria-label:', button5.getAttribute('aria-label'));
                     button5.classList.add('fast-pulse');
-
                     setTimeout(() => button5.classList.remove('fast-pulse'), 15000);
-                    button5.addEventListener('click', () => {
-                        setTimeout(() => button5.classList.remove('fast-pulse'), 1000);
-                    }, { once: true });
                 }
-
-                const attachButtons = document.querySelectorAll('button[aria-label*="attach"], button[title*="attach"], button[aria-label*="file"], button[title*="file"]');
-                attachButtons.forEach(btn => {
-                    console.log('🎯 DEBUG: Found potential attach button:', btn.textContent?.trim(), btn.getAttribute('aria-label'));
-                    btn.classList.add('fast-pulse');
-                    setTimeout(() => btn.classList.remove('fast-pulse'), 15000);
-                });
             };
 
             setTimeout(findAttachButton, 100);
@@ -432,7 +366,6 @@
                 }
             });
 
-            console.log('🎯 DEBUG: Waiting 600ms for page to settle...');
             await new Promise(resolve => setTimeout(resolve, 600));
 
             if (storedPrompt && (cameFromWidget || isFileMode)) {
@@ -487,9 +420,7 @@
         return;
     }
 
-    // ZOOM-RESISTANT DIMENSIONS AND POSITIONING
-    let evaWidget = null;
-
+    // ZOOM-RESISTANT DIMENSIONS
     const getZoomLevel = () => {
         return window.devicePixelRatio || 1;
     };
@@ -511,153 +442,42 @@
         };
     };
 
-    const getDomainKey = (baseKey) => {
-        const domain = window.location.hostname.replace(/[^a-zA-Z0-9]/g, '_');
-        return `${baseKey}_${domain}`;
-    };
-
-    const domainSpecificSavePos = (x, y) => {
-        try {
-            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-
-            const data = {
-                percentX: (x / vw) * 100,
-                percentY: (y / vh) * 100,
-                absoluteX: x,
-                absoluteY: y,
-                windowWidth: vw,
-                windowHeight: vh,
-                timestamp: Date.now(),
-                url: window.location.hostname
-            };
-
-            const posKey = getDomainKey('evaWidgetPosition');
-            const backupKey = getDomainKey('evaWidgetPositionBackup');
-            const backup2Key = getDomainKey('evaWidgetPositionBackup2');
-
-            safeGM_setValue(posKey, JSON.stringify(data));
-            safeGM_setValue(backupKey, JSON.stringify(data));
-            safeGM_setValue(backup2Key, JSON.stringify(data));
-
-            console.log('🎯 Position saved for domain:', window.location.hostname, 'at:', data);
-        } catch (e) {
-            console.log('🎯 Domain-specific save failed:', e);
-        }
-    };
-
-    // FIXED POSITION LOADING - TOP CENTER DEFAULT
-    const domainSpecificLoadPos = () => {
-        try {
-            const posKey = getDomainKey('evaWidgetPosition');
-            const backupKey = getDomainKey('evaWidgetPositionBackup');
-            const backup2Key = getDomainKey('evaWidgetPositionBackup2');
-
-            const saved = safeGM_getValue(posKey, '') ||
-                         safeGM_getValue(backupKey, '') ||
-                         safeGM_getValue(backup2Key, '');
-
-            if (saved) {
-                const pos = JSON.parse(saved);
-                console.log('🎯 Position loaded for domain:', window.location.hostname, 'from:', pos);
-
-                if (pos.percentX !== undefined && pos.percentY !== undefined) {
-                    const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-                    const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-
-                    let x = (pos.percentX * vw) / 100;
-                    let y = (pos.percentY * vh) / 100;
-
-                    const margin = Math.min(vw * 0.01, 20);
-                    x = Math.max(margin, Math.min(x, vw - 200));
-                    y = Math.max(margin, Math.min(y, vh - 50));
-
-                    console.log('🎯 Calculated position for domain:', window.location.hostname, ':', { x, y });
-                    return { x, y };
-                }
-            } else {
-                console.log('🎯 No saved position found for domain:', window.location.hostname);
-            }
-        } catch (e) {
-            console.log('🎯 Domain-specific load failed:', e);
-        }
-
-        // DEFAULT POSITION: TOP CENTER
+    // ALWAYS TOP CENTER POSITIONING - NO SAVING/LOADING
+    const getTopCenterPosition = () => {
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
         const dimensions = getZoomResistantDimensions();
         const widgetWidth = dimensions.expanded.width;
-
-        const defaultPos = {
+        
+        const topCenterPos = { 
             x: (vw - widgetWidth) / 2, // Center horizontally
             y: 20 // 20px from top
         };
-        console.log('🎯 Using TOP CENTER default position for domain:', window.location.hostname, ':', defaultPos);
-        return defaultPos;
+        console.log('🎯 Using TOP CENTER position:', topCenterPos);
+        return topCenterPos;
     };
 
-    const domainSpecificSaveMin = (min) => {
+    // MINIMIZED STATE MANAGEMENT (still save this)
+    const saveMinimizedState = (min) => {
         try {
-            const minKey = getDomainKey('evaWidgetMinimized');
-            const minBackupKey = getDomainKey('evaWidgetMinimizedBackup');
-
-            safeGM_setValue(minKey, min);
-            safeGM_setValue(minBackupKey, min);
-            console.log('🎯 Minimized state saved for domain:', window.location.hostname, ':', min);
+            safeGM_setValue('evaWidgetMinimized', min);
+            console.log('🎯 Minimized state saved:', min);
         } catch (e) {
-            console.log('🎯 Domain-specific min save failed:', e);
+            console.log('🎯 Minimized state save failed:', e);
         }
     };
 
-    const domainSpecificLoadMin = () => {
+    const loadMinimizedState = () => {
         try {
-            const minKey = getDomainKey('evaWidgetMinimized');
-            const minBackupKey = getDomainKey('evaWidgetMinimizedBackup');
-
-            const min = safeGM_getValue(minKey, false) || safeGM_getValue(minBackupKey, false);
-            console.log('🎯 Minimized state loaded for domain:', window.location.hostname, ':', min);
+            const min = safeGM_getValue('evaWidgetMinimized', false);
+            console.log('🎯 Minimized state loaded:', min);
             return min;
         } catch (e) {
-            console.log('🎯 Domain-specific min load failed:', e);
+            console.log('🎯 Minimized state load failed:', e);
             return false;
         }
     };
 
-    const fastDraggable = (el, excludes) => {
-        let dragging = false, startX, startY, initX, initY;
-        const isExcluded = (target) => excludes.some(sel => target.matches && (target.matches(sel) || target.closest(sel)));
-
-        el.addEventListener('mousedown', (e) => {
-            if (isExcluded(e.target)) return;
-            dragging = true;
-            [startX, startY, initX, initY] = [e.clientX, e.clientY, parseInt(el.style.left) || 0, parseInt(el.style.top) || 0];
-            document.body.style.cursor = 'move';
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
-            e.preventDefault();
-            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-            const newX = Math.max(0, Math.min(initX + e.clientX - startX, vw - el.offsetWidth));
-            const newY = Math.max(0, Math.min(initY + e.clientY - startY, vh - el.offsetHeight));
-            el.style.left = newX + 'px';
-            el.style.top = newY + 'px';
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (!dragging) return;
-            dragging = false;
-            document.body.style.cursor = '';
-            const finalX = parseInt(el.style.left) || 0;
-            const finalY = parseInt(el.style.top) || 0;
-            domainSpecificSavePos(finalX, finalY);
-            console.log('🎯 Position saved after drag:', finalX, finalY);
-        });
-    };
-
-               // GLOBAL SEARCH FUNCTION - SIMPLE NEW TAB (COMPATIBILITY FIXED)
+    // GLOBAL SEARCH FUNCTION - SIMPLE NEW TAB
     let searchExecuting = false;
 
     const performSearch = (query, fileMode = false) => {
@@ -671,7 +491,6 @@
         console.log('🎯 Query:', query);
         console.log('🎯 File Mode:', fileMode);
 
-        // Don't proceed if no query and not in file mode
         if (!query && !fileMode) {
             console.log('🎯 ❌ No query provided and not file mode, aborting');
             searchExecuting = false;
@@ -684,39 +503,35 @@
             safeGM_setValue('cameFromWidget', true);
             safeGM_setValue('pendingEvaPrompt', query);
             safeGM_setValue('fileAttachMode', fileMode);
-
+            
             console.log('🎯 🌐 Opening Eva in NEW TAB...');
 
             const evaUrl = 'https://eva.aws.dev';
-
-            // Method 1: Simple window.open
+            
             console.log('🎯 Trying simple window.open...');
             const newWindow = window.open(evaUrl, '_blank');
-
+            
             if (newWindow) {
                 console.log('🎯 ✅ Tab opened successfully');
                 setTimeout(() => { searchExecuting = false; }, 2000);
                 return true;
             }
-
-            // Method 2: If blocked, create and click link (simple version)
+            
             console.log('🎯 Window.open blocked, trying link method...');
             const link = document.createElement('a');
             link.href = evaUrl;
             link.target = '_blank';
             link.style.display = 'none';
             document.body.appendChild(link);
-
-            // Simple click - no complex MouseEvent
+            
             link.click();
-
-            // Clean up
+            
             setTimeout(() => {
                 if (link.parentNode) {
                     document.body.removeChild(link);
                 }
             }, 100);
-
+            
             console.log('🎯 ✅ Link clicked - tab should open');
             setTimeout(() => { searchExecuting = false; }, 2000);
             return true;
@@ -729,7 +544,7 @@
         }
     };
 
-    // Theme context menu (keeping existing code)
+    // Theme context menu
     const createThemeMenu = (x, y, applyThemeCallback) => {
         const existingMenu = document.getElementById('eva-theme-menu');
         if (existingMenu) existingMenu.remove();
@@ -831,23 +646,10 @@
                 applyThemeCallback(themeKey);
                 menu.remove();
                 console.log('🎯 Global theme changed to:', theme.name);
-                showThemeChangeNotification(theme.name);
             };
 
             menu.appendChild(item);
         });
-
-        const footer = document.createElement('div');
-        footer.style.cssText = `
-            padding: 6px 15px !important;
-            background: #f8f9fa !important;
-            border-top: 1px solid #eee !important;
-            font-size: 10px !important;
-            color: #666 !important;
-            text-align: center !important;
-        `;
-        footer.textContent = 'Theme applies to all pages globally';
-        menu.appendChild(footer);
 
         document.body.appendChild(menu);
 
@@ -873,66 +675,20 @@
         return menu;
     };
 
-    const showThemeChangeNotification = (themeName) => {
-        const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed !important;
-            top: 20px !important;
-            right: 20px !important;
-            background: #232F3E !important;
-            color: #ffffff !important;
-            padding: 12px 20px !important;
-            border-radius: 6px !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
-            z-index: 2147483649 !important;
-            font-family: "Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif !important;
-            font-size: 14px !important;
-            border-left: 4px solid #ff9900 !important;
-            opacity: 0 !important;
-            transform: translateX(100%) !important;
-            transition: all 0.3s ease !important;
-        `;
-        notification.innerHTML = `
-            <div style="display: flex; align-items: center;">
-                <span style="margin-right: 8px;">🎨</span>
-                <span>Theme changed to <strong>${themeName}</strong></span>
-            </div>
-            <div style="font-size: 11px; margin-top: 4px; opacity: 0.8;">
-                Applied globally across all pages
-            </div>
-        `;
-
-        document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.style.opacity = '1';
-            notification.style.transform = 'translateX(0)';
-        }, 100);
-
-        setTimeout(() => {
-            notification.style.opacity = '0';
-            notification.style.transform = 'translateX(100%)';
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }, 3000);
-    };
-
-    const createFastWidget = () => {
+    const createWidget = () => {
         const existing = document.getElementById('eva-search-box');
         if (existing && existing.parentNode && existing.offsetParent !== null) return existing;
         if (existing) existing.remove();
-        if (!document.body) { setTimeout(createFastWidget, 50); return; }
+        if (!document.body) { setTimeout(createWidget, 50); return; }
 
-        const pos = domainSpecificLoadPos();
-        const isMin = domainSpecificLoadMin();
+        // ALWAYS USE TOP CENTER - NO POSITION SAVING/LOADING
+        const pos = getTopCenterPosition();
+        const isMin = loadMinimizedState(); // Still load minimized state
         const currentThemeName = loadGlobalTheme();
         const currentTheme = themes[currentThemeName] || themes.default;
         const dimensions = getZoomResistantDimensions();
 
-        console.log('🎯 Creating widget for domain:', window.location.hostname, 'at TOP CENTER position:', pos, 'minimized:', isMin, 'global theme:', currentThemeName);
+        console.log('🎯 Creating widget at FIXED TOP CENTER position:', pos, 'minimized:', isMin, 'theme:', currentThemeName);
 
         const currentDim = isMin ? dimensions.minimized : dimensions.expanded;
         const zoom = dimensions.zoom;
@@ -1025,7 +781,7 @@
         attachBtn.onmouseenter = () => attachBtn.style.backgroundColor = '#f0f0f0';
         attachBtn.onmouseleave = () => attachBtn.style.backgroundColor = 'transparent';
 
-        const createFastMinBtn = (side, arrow) => {
+        const createMinBtn = (side, arrow) => {
             const btn = document.createElement('div');
             btn.innerHTML = arrow;
             btn.className = 'eva-minimize-button';
@@ -1057,8 +813,8 @@
             return btn;
         };
 
-        const leftBtn = createFastMinBtn('left', isMin ? '◀' : '▶');
-        const rightBtn = createFastMinBtn('right', isMin ? '▶' : '◀');
+        const leftBtn = createMinBtn('left', isMin ? '◀' : '▶');
+        const rightBtn = createMinBtn('right', isMin ? '▶' : '◀');
 
         const applyTheme = (themeName) => {
             const theme = themes[themeName] || themes.default;
@@ -1093,10 +849,8 @@
 
         listenForThemeChanges(applyTheme);
 
-        // SINGLE CONSOLIDATED EVENT HANDLER - NO DUPLICATES
-        console.log('🎯 Setting up SINGLE event handler...');
-
-        let searchInProgress = false; // Prevent multiple simultaneous searches
+        // EVENT HANDLERS
+        let searchInProgress = false;
 
         const handleSearch = (query, fileMode = false) => {
             if (searchInProgress) {
@@ -1112,7 +866,6 @@
                 input.value = '';
             }
 
-            // Reset flag after a delay
             setTimeout(() => {
                 searchInProgress = false;
             }, 1000);
@@ -1120,16 +873,14 @@
             return success;
         };
 
-        // Method 1: Attach button click
         attachBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
             console.log('🎯 🖱️ ATTACH BUTTON CLICKED!');
             const query = input.value.trim();
             handleSearch(query, true);
-        }, { once: false, passive: false });
+        });
 
-        // Method 2: ONLY ONE Enter key handler
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -1138,25 +889,27 @@
                 const query = input.value.trim();
                 handleSearch(query, false);
             }
-        }, { once: false, passive: false });
+        });
 
-        // Method 3: Form wrapper (but prevent default submission)
         const form = document.createElement('form');
         form.style.cssText = 'margin: 0; padding: 0; display: contents;';
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('🎯 📝 FORM SUBMIT PREVENTED - using keydown handler instead');
-            // Don't call handleSearch here - let the keydown handler do it
-        }, { once: false, passive: false });
+        });
 
         const toggleMinimize = () => {
             const currentMin = input.style.display === 'none';
             const newMin = !currentMin;
             const newDim = newMin ? dimensions.minimized : dimensions.expanded;
-
+            
             console.log('🎯 Toggling minimize from', currentMin, 'to', newMin);
-
+            
+            // ALWAYS RECENTER WHEN TOGGLING
+            const newPos = getTopCenterPosition();
+            container.style.left = newPos.x + 'px';
+            container.style.top = newPos.y + 'px';
+            
             if (newMin) {
                 input.style.display = 'none';
                 leftBtn.innerHTML = '◀';
@@ -1171,9 +924,9 @@
                 inputContainer.style.justifyContent = 'space-between';
                 setTimeout(() => input.focus(), 100);
             }
-
-            domainSpecificSaveMin(newMin);
-            console.log('🎯 Minimized state saved:', newMin);
+            
+            saveMinimizedState(newMin);
+            console.log('🎯 Minimized state saved and recentered:', newMin);
         };
 
         leftBtn.onclick = rightBtn.onclick = (e) => {
@@ -1189,8 +942,8 @@
         container.appendChild(leftBtn);
         container.appendChild(rightBtn);
 
-        // Make draggable
-        fastDraggable(container, ['input', 'div[class*="minimize"]', 'svg', 'path', 'form']);
+        // NO DRAGGING - WIDGET STAYS AT TOP CENTER
+        // (Removed fastDraggable function call)
 
         document.body.appendChild(container);
 
@@ -1206,7 +959,7 @@
             }, 100);
         }
 
-        console.log('🎯 Widget created successfully for domain:', window.location.hostname);
+        console.log('🎯 Widget created at FIXED TOP CENTER position');
         return container;
     };
 
@@ -1230,64 +983,60 @@
     };
 
     // INITIALIZATION
-    const fastInit = () => {
-        console.log('🎯 Fast initialization starting...');
-
-        // Wait for body to be available
+    const init = () => {
+        console.log('🎯 Initialization starting...');
+        
         if (!document.body) {
             console.log('🎯 Body not ready, waiting...');
-            setTimeout(fastInit, 50);
+            setTimeout(init, 50);
             return;
         }
 
-        // Create the widget
-        const widget = createFastWidget();
-
+        const widget = createWidget();
+        
         if (widget) {
-            console.log('🎯 Widget created successfully');
-
-            // Apply initial theme
+            console.log('🎯 Widget created successfully at TOP CENTER');
+            
             const currentTheme = themes[loadGlobalTheme()] || themes.default;
             updateThemeStyles(currentTheme, getZoomLevel());
-
-            // Handle window resize
+            
+            // Handle window resize - ALWAYS RECENTER
             let resizeTimeout;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(() => {
-                    console.log('🎯 Window resized, updating widget position');
-                    const pos = domainSpecificLoadPos();
+                    console.log('🎯 Window resized, recentering widget');
+                    const pos = getTopCenterPosition();
                     widget.style.left = pos.x + 'px';
                     widget.style.top = pos.y + 'px';
                 }, 250);
             });
-
-            console.log('🎯 Initialization complete');
+            
+            console.log('🎯 Initialization complete - FIXED TOP CENTER');
         } else {
             console.log('🎯 Widget creation failed');
         }
     };
 
     // START THE WIDGET
-    console.log('🎯 Starting Eva Widget initialization...');
-
+    console.log('🎯 Starting Eva Widget - ALWAYS TOP CENTER MODE');
+    
     if (document.readyState !== 'loading') {
         console.log('🎯 Document ready, initializing immediately');
-        fastInit();
+        init();
     } else {
         console.log('🎯 Document loading, waiting for DOMContentLoaded');
-        document.addEventListener('DOMContentLoaded', fastInit);
+        document.addEventListener('DOMContentLoaded', init);
     }
 
-    // Backup initialization
     setTimeout(() => {
         console.log('🎯 Backup initialization check...');
         if (!document.getElementById('eva-search-box')) {
             console.log('🎯 Widget not found, creating via backup method');
-            createFastWidget();
+            createWidget();
         }
     }, 100);
 
-    console.log('🎯 Eva Widget script loaded successfully');
+    console.log('🎯 Eva Widget script loaded - TOP CENTER PERSISTENT MODE');
 
 })();
