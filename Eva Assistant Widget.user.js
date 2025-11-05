@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.5
 // @description  Eva Widget - Instantly use Eva from any page
 // @author       You
 // @match        *://*/*
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_addStyle
-// @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Eva%20Assistant%20Widget.user.js
-// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Eva%20Assistant%20Widget.user.js
+// @updateURL    https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
+// @downloadURL  https://github.com/charliefowle03/EvaAIassistant/raw/refs/heads/main/Firefox%20Version%20-%20Eva%20Assistant%20Widget.user.js
 // ==/UserScript==
 
 (function() {
@@ -442,7 +442,28 @@
         };
     };
 
-    // ALWAYS TOP CENTER POSITIONING - NO SAVING/LOADING
+    // POSITION MANAGEMENT - SAVE AND RESTORE POSITION
+    const savePosition = (position) => {
+        try {
+            safeGM_setValue('evaWidgetPosition', position);
+            console.log('🎯 Position saved:', position);
+        } catch (e) {
+            console.log('🎯 Position save failed:', e);
+        }
+    };
+
+    const loadPosition = () => {
+        try {
+            const savedPos = safeGM_getValue('evaWidgetPosition', null);
+            console.log('🎯 Position loaded:', savedPos);
+            return savedPos;
+        } catch (e) {
+            console.log('🎯 Position load failed:', e);
+            return null;
+        }
+    };
+
+    // TOP CENTER POSITIONING FOR NEW TABS ONLY
     const getTopCenterPosition = () => {
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const dimensions = getZoomResistantDimensions();
@@ -452,11 +473,61 @@
             x: (vw - widgetWidth) / 2, // Center horizontally
             y: 20 // 20px from top
         };
-        console.log('🎯 Using TOP CENTER position:', topCenterPos);
+        console.log('🎯 Using TOP CENTER position for new tab:', topCenterPos);
         return topCenterPos;
     };
 
-    // MINIMIZED STATE MANAGEMENT (still save this)
+    // SMART POSITION DETECTION - NEW TAB VS REFRESH/NAVIGATION
+    const getInitialPosition = () => {
+        // Check if this is a new tab opened by the widget
+        const cameFromWidget = safeGM_getValue('cameFromWidget', false);
+
+        if (cameFromWidget) {
+            // This is a new Eva tab - use top center and save it
+            console.log('🎯 New Eva tab detected - using top center position');
+            const topCenterPos = getTopCenterPosition();
+            savePosition(topCenterPos);
+            return topCenterPos;
+        }
+
+        // This is a refresh or navigation - try to restore saved position
+        const savedPos = loadPosition();
+
+        if (savedPos) {
+            // Validate saved position is still within viewport
+            const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+            const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+            const dimensions = getZoomResistantDimensions();
+            const widgetWidth = dimensions.expanded.width;
+            const widgetHeight = dimensions.expanded.height;
+
+            // Check if saved position is still valid
+            if (savedPos.x >= 0 &&
+                savedPos.y >= 0 &&
+                savedPos.x + widgetWidth <= vw &&
+                savedPos.y + widgetHeight <= vh) {
+                console.log('🎯 Using saved position (refresh/navigation):', savedPos);
+                return savedPos;
+            } else {
+                console.log('🎯 Saved position invalid, adjusting to fit viewport');
+                // Adjust position to fit current viewport
+                const adjustedPos = {
+                    x: Math.max(0, Math.min(savedPos.x, vw - widgetWidth)),
+                    y: Math.max(0, Math.min(savedPos.y, vh - widgetHeight))
+                };
+                savePosition(adjustedPos);
+                return adjustedPos;
+            }
+        }
+
+        // No saved position - use top center as fallback
+        console.log('🎯 No saved position - using top center as fallback');
+        const topCenterPos = getTopCenterPosition();
+        savePosition(topCenterPos);
+        return topCenterPos;
+    };
+
+    // MINIMIZED STATE MANAGEMENT
     const saveMinimizedState = (min) => {
         try {
             safeGM_setValue('evaWidgetMinimized', min);
@@ -477,7 +548,7 @@
         }
     };
 
-    // GLOBAL SEARCH FUNCTION - SIMPLE NEW TAB
+    // GLOBAL SEARCH FUNCTION - FIXED VERSION
     let searchExecuting = false;
 
     const performSearch = (query, fileMode = false) => {
@@ -508,32 +579,40 @@
 
             const evaUrl = 'https://eva.aws.dev';
 
-            console.log('🎯 Trying simple window.open...');
+            // Try window.open first
+            console.log('🎯 Trying window.open...');
             const newWindow = window.open(evaUrl, '_blank');
 
-            if (newWindow) {
-                console.log('🎯 ✅ Tab opened successfully');
+            if (newWindow && !newWindow.closed) {
+                console.log('🎯 ✅ Tab opened successfully with window.open');
                 setTimeout(() => { searchExecuting = false; }, 2000);
                 return true;
             }
 
-            console.log('🎯 Window.open blocked, trying link method...');
-            const link = document.createElement('a');
-            link.href = evaUrl;
-            link.target = '_blank';
-            link.style.display = 'none';
-            document.body.appendChild(link);
+            // Only try link method if window.open definitely failed
+            console.log('🎯 Window.open failed or blocked, trying link method...');
 
-            link.click();
-
+            // Add a small delay to prevent race conditions
             setTimeout(() => {
-                if (link.parentNode) {
-                    document.body.removeChild(link);
-                }
+                const link = document.createElement('a');
+                link.href = evaUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer'; // Security best practice
+                link.style.display = 'none';
+                document.body.appendChild(link);
+
+                link.click();
+
+                setTimeout(() => {
+                    if (link.parentNode) {
+                        document.body.removeChild(link);
+                    }
+                    searchExecuting = false;
+                }, 100);
+
+                console.log('🎯 ✅ Link clicked - tab should open');
             }, 100);
 
-            console.log('🎯 ✅ Link clicked - tab should open');
-            setTimeout(() => { searchExecuting = false; }, 2000);
             return true;
 
         } catch (error) {
@@ -542,6 +621,150 @@
             alert('Error occurred: ' + error.message);
             return false;
         }
+    };
+
+    // OPTIMIZED DRAGGING FUNCTIONALITY WITH POSITION SAVING
+    const optimizedDraggable = (element) => {
+        let isDragging = false;
+        let startX, startY, initialX, initialY;
+        let dragStarted = false;
+        let dragTimeout;
+
+        const onMouseDown = (e) => {
+            // Check if we're clicking on interactive elements that should NOT trigger drag
+            const isMinimizeButton = e.target.closest('.eva-minimize-button');
+            const isAttachButton = e.target.closest('[title="Attach file to Eva"]');
+
+            if (isMinimizeButton || isAttachButton) {
+                console.log('🎯 Click on interactive element - no drag');
+                return; // Don't start drag for these elements
+            }
+
+            // Clear any existing timeout
+            if (dragTimeout) {
+                clearTimeout(dragTimeout);
+                dragTimeout = null;
+            }
+
+            // Store initial values
+            startX = e.clientX;
+            startY = e.clientY;
+
+            const rect = element.getBoundingClientRect();
+            initialX = rect.left;
+            initialY = rect.top;
+
+            dragStarted = false;
+
+            // Check if we're clicking on the input field
+            const input = element.querySelector('#eva-search-input');
+            const isInputClick = input && (e.target === input || input.contains(e.target));
+
+            // Much shorter delay for input field - only 100ms
+            const delay = isInputClick ? 100 : 50;
+
+            // Set a very short delay before starting drag
+            dragTimeout = setTimeout(() => {
+                if (!dragStarted) {
+                    isDragging = true;
+                    element.style.cursor = 'grabbing';
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    console.log('🎯 Drag started after short delay');
+                }
+            }, delay);
+
+            // Always prevent default to avoid text selection issues
+            e.preventDefault();
+        };
+
+        const onMouseMove = (e) => {
+            if (!isDragging) {
+                // Very low threshold for immediate drag start - just 3px
+                const deltaX = Math.abs(e.clientX - startX);
+                const deltaY = Math.abs(e.clientY - startY);
+
+                if (deltaX > 3 || deltaY > 3) {
+                    // Clear timeout and start dragging immediately
+                    if (dragTimeout) {
+                        clearTimeout(dragTimeout);
+                        dragTimeout = null;
+                    }
+                    isDragging = true;
+                    dragStarted = true;
+                    element.style.cursor = 'grabbing';
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                    console.log('🎯 Drag started by movement (optimized)');
+
+                    // Blur input if we're dragging from it
+                    const input = element.querySelector('#eva-search-input');
+                    if (input && input === document.activeElement) {
+                        input.blur();
+                    }
+                }
+                return;
+            }
+
+            dragStarted = true;
+
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+
+            let newX = initialX + deltaX;
+            let newY = initialY + deltaY;
+
+            // Keep widget within viewport bounds
+            const rect = element.getBoundingClientRect();
+            const maxX = window.innerWidth - rect.width;
+            const maxY = window.innerHeight - rect.height;
+
+            newX = Math.max(0, Math.min(newX, maxX));
+            newY = Math.max(0, Math.min(newY, maxY));
+
+            element.style.left = newX + 'px';
+            element.style.top = newY + 'px';
+        };
+
+        const onMouseUp = (e) => {
+            // Clear timeout if it exists
+            if (dragTimeout) {
+                clearTimeout(dragTimeout);
+                dragTimeout = null;
+            }
+
+            if (!isDragging && !dragStarted) {
+                // This was just a click, not a drag
+                console.log('🎯 Click detected (no drag) - optimized');
+
+                // For input clicks, focus the input
+                const input = element.querySelector('#eva-search-input');
+                if (input && (e.target === input || input.contains(e.target))) {
+                    setTimeout(() => input.focus(), 10);
+                }
+                return;
+            }
+
+            if (isDragging) {
+                isDragging = false;
+                element.style.cursor = 'move';
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+
+                // SAVE POSITION AFTER DRAG ENDS
+                const rect = element.getBoundingClientRect();
+                const newPosition = { x: rect.left, y: rect.top };
+                savePosition(newPosition);
+                console.log('🎯 Drag ended - position saved:', newPosition);
+            }
+
+            // Reset drag state
+            dragStarted = false;
+        };
+
+        // Add mouse events to the entire widget
+        element.addEventListener('mousedown', onMouseDown);
+        element.style.cursor = 'move';
     };
 
     // Theme context menu
@@ -681,14 +904,21 @@
         if (existing) existing.remove();
         if (!document.body) { setTimeout(createWidget, 50); return; }
 
-        // ALWAYS USE TOP CENTER - NO POSITION SAVING/LOADING
-        const pos = getTopCenterPosition();
-        const isMin = loadMinimizedState(); // Still load minimized state
-        const currentThemeName = loadGlobalTheme();
+        // Use smart position detection - saved position for refresh, top center for new tabs
+        const pos = getInitialPosition();
+        const isMin = loadMinimizedState();
+
+        // Ensure Amazon Orange theme by default
+        let currentThemeName = loadGlobalTheme();
+        if (!currentThemeName || !themes[currentThemeName]) {
+            currentThemeName = 'default';
+            saveGlobalTheme('default');
+        }
+
         const currentTheme = themes[currentThemeName] || themes.default;
         const dimensions = getZoomResistantDimensions();
 
-        console.log('🎯 Creating widget at FIXED TOP CENTER position:', pos, 'minimized:', isMin, 'theme:', currentThemeName);
+        console.log('🎯 Creating widget at position:', pos, 'minimized:', isMin, 'theme:', currentThemeName);
 
         const currentDim = isMin ? dimensions.minimized : dimensions.expanded;
         const zoom = dimensions.zoom;
@@ -720,6 +950,7 @@
             opacity: 1 !important;
             transform: scale(1) !important;
             transform-origin: top left !important;
+            user-select: none !important;
         `;
 
         const inputContainer = document.createElement('div');
@@ -731,6 +962,7 @@
             height: ${(currentDim.height - 8/zoom)}px !important;
             padding: 0 !important;
             width: 100% !important;
+            pointer-events: auto !important;
         `;
 
         const input = document.createElement('input');
@@ -759,7 +991,16 @@
             visibility: visible !important;
             opacity: 1 !important;
             transform: scale(1) !important;
+            user-select: text !important;
+            pointer-events: auto !important;
+            autocomplete: off !important;
         `;
+
+        // Disable browser autocomplete and dropdown
+        input.setAttribute('autocomplete', 'off');
+        input.setAttribute('autocorrect', 'off');
+        input.setAttribute('autocapitalize', 'off');
+        input.setAttribute('spellcheck', 'false');
 
         const attachBtn = document.createElement('div');
         const svgSize = Math.max(16/zoom, currentDim.height * 0.44);
@@ -776,6 +1017,7 @@
             width: ${Math.max(20/zoom, currentDim.height * 0.55)}px !important;
             height: ${Math.max(20/zoom, currentDim.height * 0.55)}px !important;
             transform: scale(1) !important;
+            pointer-events: auto !important;
         `;
         attachBtn.title = 'Attach file to Eva';
         attachBtn.onmouseenter = () => attachBtn.style.backgroundColor = '#f0f0f0';
@@ -807,6 +1049,7 @@
                 font-family: "Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif !important;
                 transition: background-color 0.1s !important;
                 z-index: 1000001 !important;
+                pointer-events: auto !important;
             `;
             btn.onmouseenter = () => btn.style.backgroundColor = currentTheme.buttonHover;
             btn.onmouseleave = () => btn.style.backgroundColor = currentTheme.buttonBg;
@@ -876,7 +1119,26 @@
         attachBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('🎯 🖱️ ATTACH BUTTON CLICKED!');
+
+            // Add debugging and prevent rapid clicks
+            console.log('🎯 🖱️ ATTACH BUTTON CLICKED! Event details:', {
+                type: e.type,
+                target: e.target,
+                currentTarget: e.currentTarget,
+                timeStamp: e.timeStamp
+            });
+
+            // Prevent multiple rapid clicks
+            if (attachBtn.dataset.clicking === 'true') {
+                console.log('🎯 🚫 RAPID CLICK BLOCKED');
+                return;
+            }
+
+            attachBtn.dataset.clicking = 'true';
+            setTimeout(() => {
+                attachBtn.dataset.clicking = 'false';
+            }, 2000);
+
             const query = input.value.trim();
             handleSearch(query, true);
         });
@@ -905,11 +1167,6 @@
 
             console.log('🎯 Toggling minimize from', currentMin, 'to', newMin);
 
-            // ALWAYS RECENTER WHEN TOGGLING
-            const newPos = getTopCenterPosition();
-            container.style.left = newPos.x + 'px';
-            container.style.top = newPos.y + 'px';
-
             if (newMin) {
                 input.style.display = 'none';
                 leftBtn.innerHTML = '◀';
@@ -926,13 +1183,23 @@
             }
 
             saveMinimizedState(newMin);
-            console.log('🎯 Minimized state saved and recentered:', newMin);
+            console.log('🎯 Minimized state saved:', newMin);
         };
 
-        leftBtn.onclick = rightBtn.onclick = (e) => {
+        // FIXED: Prevent minimize buttons from interfering with drag
+        leftBtn.addEventListener('click', (e) => {
+            e.preventDefault();
             e.stopPropagation();
+            console.log('🎯 Left minimize button clicked');
             toggleMinimize();
-        };
+        });
+
+        rightBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🎯 Right minimize button clicked');
+            toggleMinimize();
+        });
 
         // Assembly
         form.appendChild(input);
@@ -942,8 +1209,8 @@
         container.appendChild(leftBtn);
         container.appendChild(rightBtn);
 
-        // NO DRAGGING - WIDGET STAYS AT TOP CENTER
-        // (Removed fastDraggable function call)
+        // Enable optimized dragging with position saving
+        optimizedDraggable(container);
 
         document.body.appendChild(container);
 
@@ -959,7 +1226,7 @@
             }, 100);
         }
 
-        console.log('🎯 Widget created at FIXED TOP CENTER position');
+        console.log('🎯 Widget created with position persistence enabled');
         return container;
     };
 
@@ -979,6 +1246,16 @@
             .eva-minimize-button:hover {
                 background-color: ${theme.buttonHover} !important;
             }
+            /* Disable browser autocomplete dropdown */
+            #eva-search-input::-webkit-contacts-auto-fill-button,
+            #eva-search-input::-webkit-credentials-auto-fill-button {
+                visibility: hidden !important;
+                display: none !important;
+                pointer-events: none !important;
+                height: 0 !important;
+                width: 0 !important;
+                margin: 0 !important;
+            }
         `);
     };
 
@@ -995,31 +1272,62 @@
         const widget = createWidget();
 
         if (widget) {
-            console.log('🎯 Widget created successfully at TOP CENTER');
+            console.log('🎯 Widget created successfully with position persistence enabled');
 
             const currentTheme = themes[loadGlobalTheme()] || themes.default;
             updateThemeStyles(currentTheme, getZoomLevel());
 
-            // Handle window resize - ALWAYS RECENTER
+            // Handle window resize - only reposition if widget goes outside bounds
             let resizeTimeout;
             window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
                 resizeTimeout = setTimeout(() => {
-                    console.log('🎯 Window resized, recentering widget');
-                    const pos = getTopCenterPosition();
-                    widget.style.left = pos.x + 'px';
-                    widget.style.top = pos.y + 'px';
+                    console.log('🎯 Window resized, checking widget bounds');
+
+                    // Only reposition if widget is outside viewport bounds
+                    const rect = widget.getBoundingClientRect();
+                    const vw = window.innerWidth;
+                    const vh = window.innerHeight;
+
+                    let needsReposition = false;
+                    let newX = rect.left;
+                    let newY = rect.top;
+
+                    if (rect.right > vw) {
+                        newX = vw - rect.width;
+                        needsReposition = true;
+                    }
+                    if (rect.left < 0) {
+                        newX = 0;
+                        needsReposition = true;
+                    }
+                    if (rect.bottom > vh) {
+                        newY = vh - rect.height;
+                        needsReposition = true;
+                    }
+                    if (rect.top < 0) {
+                        newY = 0;
+                        needsReposition = true;
+                    }
+
+                    if (needsReposition) {
+                        console.log('🎯 Widget repositioned due to resize');
+                        widget.style.left = newX + 'px';
+                        widget.style.top = newY + 'px';
+                        // Save the new position after resize adjustment
+                        savePosition({ x: newX, y: newY });
+                    }
                 }, 250);
             });
 
-            console.log('🎯 Initialization complete - FIXED TOP CENTER');
+            console.log('🎯 Initialization complete with position persistence enabled');
         } else {
             console.log('🎯 Widget creation failed');
         }
     };
 
     // START THE WIDGET
-    console.log('🎯 Starting Eva Widget - ALWAYS TOP CENTER MODE');
+    console.log('🎯 Starting Eva Widget - Position Persistence Mode with Amazon Orange Default');
 
     if (document.readyState !== 'loading') {
         console.log('🎯 Document ready, initializing immediately');
@@ -1037,6 +1345,6 @@
         }
     }, 100);
 
-    console.log('🎯 Eva Widget script loaded - TOP CENTER PERSISTENT MODE');
+    console.log('🎯 Eva Widget script loaded - Position Persistence Mode with Amazon Orange Default');
 
 })();
