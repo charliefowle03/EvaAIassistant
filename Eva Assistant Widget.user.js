@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      2.5
+// @version      2.7
 // @description  Eva Widget - Instantly use Eva from any page
 // @author       You
 // @match        *://*/*
@@ -64,6 +64,38 @@
         }
     };
 
+    // DOMAIN RESTRICTION MANAGEMENT
+    const saveDomainRestriction = (restrictToBoost) => {
+        try {
+            safeGM_setValue('evaWidgetDomainRestriction', restrictToBoost);
+            console.log('🎯 Domain restriction saved:', restrictToBoost ? 'Boost Only' : 'All Sites');
+        } catch (e) {
+            console.log('🎯 Domain restriction save failed:', e);
+        }
+    };
+
+    const loadDomainRestriction = () => {
+        try {
+            const restricted = safeGM_getValue('evaWidgetDomainRestriction', false);
+            console.log('🎯 Domain restriction loaded:', restricted ? 'Boost Only' : 'All Sites');
+            return restricted;
+        } catch (e) {
+            console.log('🎯 Domain restriction load failed:', e);
+            return false;
+        }
+    };
+
+    const isBoostDomain = () => {
+        const hostname = window.location.hostname.toLowerCase();
+        return hostname.includes('myday-website') && hostname.includes('aws-border.com');
+    };
+
+    const shouldShowWidget = () => {
+        const restrictToBoost = loadDomainRestriction();
+        if (!restrictToBoost) return true; // Show on all sites
+        return isBoostDomain(); // Only show on Boost domains
+    };
+
     // ULTIMATE PROTECTION - CHECK IMMEDIATELY
     if (window.evaWidgetRan || window.EVA_SCRIPT_LOADED) {
         console.log('🎯 ULTIMATE PROTECTION: Script already ran - BLOCKING');
@@ -75,6 +107,12 @@
     // Prevent widget from running in iframes/ads
     if (window !== window.top) {
         console.log('🎯 Eva widget: Skipping iframe/ad window');
+        return;
+    }
+
+    // Check if widget should show on this domain
+    if (!shouldShowWidget()) {
+        console.log('🎯 Eva widget: Domain restriction active - not showing on this site');
         return;
     }
 
@@ -767,56 +805,158 @@
         element.style.cursor = 'move';
     };
 
-    // Theme context menu
+    // Enhanced theme context menu with Boost checkbox - 30% smaller with unroll animation - Theme-aware styling
     const createThemeMenu = (x, y, applyThemeCallback) => {
         const existingMenu = document.getElementById('eva-theme-menu');
         if (existingMenu) existingMenu.remove();
 
         const menu = document.createElement('div');
         menu.id = 'eva-theme-menu';
+        
+        // 30% smaller dimensions
+        const menuWidth = 140; // Reduced from 200px
+        const fontSize = 10; // Reduced from 14px
+        const padding = 8; // Reduced from 12px
+        
+        // Get current theme for menu styling
+        const currentTheme = themes[loadGlobalTheme()] || themes.default;
+        
         menu.style.cssText = `
             position: fixed !important;
             left: ${x}px !important;
             top: ${y}px !important;
-            background: #ffffff !important;
-            border: 2px solid #ff9900 !important;
-            border-radius: 6px !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+            background: ${currentTheme.background} !important;
+            border: 2px solid ${currentTheme.border} !important;
+            border-radius: 4px !important;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.3) !important;
             z-index: 2147483648 !important;
             font-family: "Amazon Ember","Helvetica Neue",Roboto,Arial,sans-serif !important;
-            font-size: 14px !important;
-            min-width: 180px !important;
+            font-size: ${fontSize}px !important;
+            min-width: ${menuWidth}px !important;
             overflow: hidden !important;
+            transform-origin: left center !important;
+            transform: scaleX(0) !important;
+            opacity: 0 !important;
+            transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.3s ease !important;
         `;
 
-        const currentTheme = loadGlobalTheme();
+        let currentDomainRestriction = loadDomainRestriction(); // Use let so we can update it
+        const currentThemeName = loadGlobalTheme();
 
-        const header = document.createElement('div');
-        header.style.cssText = `
-            padding: 8px 15px !important;
-            background: #f8f9fa !important;
-            border-bottom: 1px solid #eee !important;
-            font-weight: bold !important;
-            color: #232F3E !important;
-            font-size: 12px !important;
-            text-align: center !important;
+        // Calculate contrasting colors for text based on theme
+        const getContrastingTextColor = (bgColor) => {
+            // Simple contrast calculation - you could make this more sophisticated
+            if (bgColor === '#37475a' || bgColor === '#232F3E') {
+                return '#ffffff'; // White text for dark backgrounds
+            }
+            return '#232F3E'; // Dark text for light backgrounds
+        };
+
+        const textColor = getContrastingTextColor(currentTheme.background);
+        const hoverColor = currentTheme.focusColor || 'rgba(255, 153, 0, 0.1)';
+
+        // Boost Only Checkbox Option
+        const boostItem = document.createElement('div');
+        boostItem.style.cssText = `
+            padding: ${padding}px 10px !important;
+            cursor: pointer !important;
+            border-bottom: 1px solid ${currentTheme.borderHover} !important;
+            transition: background-color 0.2s !important;
+            display: flex !important;
+            align-items: center !important;
+            color: ${textColor} !important;
+            font-size: ${fontSize}px !important;
         `;
-        header.textContent = '🎨 Global Theme Settings';
-        menu.appendChild(header);
 
+        // Create custom checkbox with theme colors
+        const checkbox = document.createElement('div');
+        checkbox.style.cssText = `
+            width: 12px !important;
+            height: 12px !important;
+            border: 2px solid ${currentTheme.border} !important;
+            border-radius: 2px !important;
+            margin-right: 8px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            background: ${currentDomainRestriction ? currentTheme.border : currentTheme.background} !important;
+            transition: background-color 0.2s !important;
+            flex-shrink: 0 !important;
+        `;
+
+        // Function to update checkbox appearance with theme colors
+        const updateCheckboxAppearance = (isChecked) => {
+            if (isChecked) {
+                checkbox.style.background = currentTheme.border;
+                checkbox.innerHTML = '✓';
+                checkbox.style.color = currentTheme.buttonText;
+                checkbox.style.fontSize = '8px';
+                checkbox.style.fontWeight = 'bold';
+            } else {
+                checkbox.style.background = currentTheme.background;
+                checkbox.innerHTML = '';
+                checkbox.style.color = '';
+            }
+        };
+
+        // Set initial checkbox appearance
+        updateCheckboxAppearance(currentDomainRestriction);
+
+        const boostText = document.createElement('span');
+        boostText.textContent = 'Appear on Boost Only';
+        boostText.style.cssText = `
+            font-size: ${fontSize}px !important;
+            user-select: none !important;
+            color: ${textColor} !important;
+        `;
+
+        boostItem.appendChild(checkbox);
+        boostItem.appendChild(boostText);
+
+        boostItem.onmouseenter = () => boostItem.style.backgroundColor = hoverColor;
+        boostItem.onmouseleave = () => boostItem.style.backgroundColor = 'transparent';
+        
+        boostItem.onclick = (e) => {
+            e.stopPropagation();
+            
+            // Toggle the restriction state
+            currentDomainRestriction = !currentDomainRestriction;
+            
+            // Save the new state
+            saveDomainRestriction(currentDomainRestriction);
+            
+            // Update checkbox appearance immediately
+            updateCheckboxAppearance(currentDomainRestriction);
+            
+            // Show appropriate message
+            const message = currentDomainRestriction 
+                ? 'Eva Widget will now only appear on Boost domains. Refresh pages to apply changes.'
+                : 'Eva Widget will now appear on all sites. Refresh pages to apply changes.';
+            
+            setTimeout(() => {
+                alert(message);
+            }, 100);
+            
+            console.log('🎯 Domain restriction toggled to:', currentDomainRestriction ? 'Boost Only' : 'All Sites');
+        };
+        
+        menu.appendChild(boostItem);
+
+        // Theme Options
         Object.keys(themes).forEach((themeKey, index) => {
             const theme = themes[themeKey];
             const item = document.createElement('div');
             item.style.cssText = `
-                padding: 12px 15px !important;
+                padding: ${padding}px 10px !important;
                 cursor: pointer !important;
-                border-bottom: ${index < Object.keys(themes).length - 1 ? '1px solid #eee' : 'none'} !important;
+                border-bottom: ${index < Object.keys(themes).length - 1 ? `1px solid ${currentTheme.borderHover}` : 'none'} !important;
                 transition: background-color 0.2s !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: space-between !important;
-                color: #232F3E !important;
+                color: ${textColor} !important;
                 position: relative !important;
+                font-size: ${fontSize}px !important;
             `;
 
             const leftSection = document.createElement('div');
@@ -826,41 +966,43 @@
                 flex-grow: 1 !important;
             `;
 
+            const colorPreview = document.createElement('div');
+            colorPreview.style.cssText = `
+                width: 12px !important;
+                height: 12px !important;
+                border-radius: 2px !important;
+                background: ${theme.border} !important;
+                border: 1px solid ${currentTheme.borderHover} !important;
+                margin-right: 6px !important;
+                flex-shrink: 0 !important;
+            `;
+
             const themeName = document.createElement('span');
             themeName.textContent = theme.name;
             themeName.style.cssText = `
-                font-weight: ${currentTheme === themeKey ? 'bold' : 'normal'} !important;
-                margin-right: 8px !important;
-            `;
-
-            const colorPreview = document.createElement('div');
-            colorPreview.style.cssText = `
-                width: 18px !important;
-                height: 18px !important;
-                border-radius: 3px !important;
-                background: ${theme.border} !important;
-                border: 1px solid #ccc !important;
-                margin-right: 8px !important;
-                flex-shrink: 0 !important;
+                font-weight: ${currentThemeName === themeKey ? 'bold' : 'normal'} !important;
+                margin-right: 6px !important;
+                font-size: ${fontSize}px !important;
+                color: ${textColor} !important;
             `;
 
             leftSection.appendChild(colorPreview);
             leftSection.appendChild(themeName);
 
-            if (currentTheme === themeKey) {
+            if (currentThemeName === themeKey) {
                 const checkmark = document.createElement('span');
                 checkmark.textContent = '✓';
                 checkmark.style.cssText = `
-                    color: #ff9900 !important;
+                    color: ${currentTheme.border} !important;
                     font-weight: bold !important;
-                    font-size: 16px !important;
+                    font-size: ${fontSize + 2}px !important;
                 `;
                 item.appendChild(checkmark);
             }
 
             item.appendChild(leftSection);
 
-            item.onmouseenter = () => item.style.backgroundColor = '#f5f5f5';
+            item.onmouseenter = () => item.style.backgroundColor = hoverColor;
             item.onmouseleave = () => item.style.backgroundColor = 'transparent';
 
             item.onclick = (e) => {
@@ -874,26 +1016,82 @@
             menu.appendChild(item);
         });
 
+        // Add to DOM first (invisible)
         document.body.appendChild(menu);
 
-        const closeMenu = (e) => {
-            if (!menu.contains(e.target)) {
-                menu.remove();
-                document.removeEventListener('click', closeMenu);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', closeMenu), 100);
+        // Smart positioning - position to the right of the widget, but adjust if needed
+        const widget = document.getElementById('eva-search-box');
+        let finalX = x;
+        let finalY = y;
 
-        const rect = menu.getBoundingClientRect();
+        if (widget) {
+            const widgetRect = widget.getBoundingClientRect();
+            // Position to the right of the widget with some spacing
+            finalX = widgetRect.right + 10;
+            finalY = widgetRect.top;
+        }
+
+        // Get viewport dimensions
         const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
         const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
 
-        if (rect.right > vw) {
-            menu.style.left = (x - rect.width) + 'px';
+        // Get menu dimensions after adding to DOM
+        const rect = menu.getBoundingClientRect();
+        const menuHeight = rect.height;
+
+        // Adjust horizontal position if menu would go off-screen
+        if (finalX + menuWidth > vw) {
+            if (widget) {
+                const widgetRect = widget.getBoundingClientRect();
+                // Position to the left of the widget instead
+                finalX = widgetRect.left - menuWidth - 10;
+            } else {
+                // Fallback: position from right edge
+                finalX = vw - menuWidth - 10;
+            }
         }
-        if (rect.bottom > vh) {
-            menu.style.top = (y - rect.height) + 'px';
+
+        // Ensure menu doesn't go off left edge
+        if (finalX < 10) {
+            finalX = 10;
         }
+
+        // Adjust vertical position if menu would go off-screen
+        if (finalY + menuHeight > vh) {
+            finalY = vh - menuHeight - 10;
+        }
+
+        // Ensure menu doesn't go off top edge
+        if (finalY < 10) {
+            finalY = 10;
+        }
+
+        // Apply final position
+        menu.style.left = finalX + 'px';
+        menu.style.top = finalY + 'px';
+
+        // Trigger the unroll animation
+        setTimeout(() => {
+            menu.style.transform = 'scaleX(1)';
+            menu.style.opacity = '1';
+        }, 10);
+
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                // Animate out before removing
+                menu.style.transform = 'scaleX(0)';
+                menu.style.opacity = '0';
+                setTimeout(() => {
+                    if (menu.parentNode) {
+                        menu.remove();
+                    }
+                }, 300);
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        
+        // Add close listener after a short delay to prevent immediate closing
+        setTimeout(() => document.addEventListener('click', closeMenu), 100);
 
         return menu;
     };
@@ -1327,7 +1525,7 @@
     };
 
     // START THE WIDGET
-    console.log('🎯 Starting Eva Widget - Position Persistence Mode with Amazon Orange Default');
+    console.log('🎯 Starting Eva Widget - Theme-Aware Settings Menu with Boost Domain Option');
 
     if (document.readyState !== 'loading') {
         console.log('🎯 Document ready, initializing immediately');
@@ -1345,6 +1543,6 @@
         }
     }, 100);
 
-    console.log('🎯 Eva Widget script loaded - Position Persistence Mode with Amazon Orange Default');
+    console.log('🎯 Eva Widget script loaded - Theme-Aware Settings Menu with Boost Domain Option');
 
 })();
