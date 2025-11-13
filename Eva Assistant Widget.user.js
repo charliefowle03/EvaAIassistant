@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Eva Assistant Widget
 // @namespace    http://tampermonkey.net/
-// @version      2.7
+// @version      2.8
 // @description  Eva Widget - Instantly use Eva from any page
 // @author       You
 // @match        *://*/*
@@ -661,7 +661,7 @@
         }
     };
 
-    // OPTIMIZED DRAGGING FUNCTIONALITY WITH POSITION SAVING
+    // OPTIMIZED DRAGGING FUNCTIONALITY WITH POSITION SAVING - FIXED INPUT INTERACTION
     const optimizedDraggable = (element) => {
         let isDragging = false;
         let startX, startY, initialX, initialY;
@@ -672,12 +672,85 @@
             // Check if we're clicking on interactive elements that should NOT trigger drag
             const isMinimizeButton = e.target.closest('.eva-minimize-button');
             const isAttachButton = e.target.closest('[title="Attach file to Eva"]');
+            const input = element.querySelector('#eva-search-input');
+            const isInputClick = input && (e.target === input || input.contains(e.target));
 
             if (isMinimizeButton || isAttachButton) {
                 console.log('🎯 Click on interactive element - no drag');
                 return; // Don't start drag for these elements
             }
 
+            // SPECIAL HANDLING FOR INPUT FIELD
+            if (isInputClick) {
+                console.log('🎯 Input field clicked - allowing normal interaction');
+                
+                // For input field, only start drag detection after a longer delay and movement
+                let inputDragStarted = false;
+                
+                const inputDragTimeout = setTimeout(() => {
+                    if (!inputDragStarted) {
+                        // Only start drag if input is not focused or user moved significantly
+                        const deltaX = Math.abs((window.lastMouseX || e.clientX) - e.clientX);
+                        const deltaY = Math.abs((window.lastMouseY || e.clientY) - e.clientY);
+                        
+                        if ((deltaX > 10 || deltaY > 10) && document.activeElement !== input) {
+                            console.log('🎯 Input drag started after movement and no focus');
+                            startDragFromInput(e);
+                        }
+                    }
+                }, 300); // Much longer delay for input
+
+                const clearInputDrag = () => {
+                    clearTimeout(inputDragTimeout);
+                    inputDragStarted = true;
+                    document.removeEventListener('mousemove', trackInputMovement);
+                    document.removeEventListener('mouseup', clearInputDrag);
+                };
+
+                const trackInputMovement = (moveEvent) => {
+                    window.lastMouseX = moveEvent.clientX;
+                    window.lastMouseY = moveEvent.clientY;
+                    
+                    const deltaX = Math.abs(moveEvent.clientX - e.clientX);
+                    const deltaY = Math.abs(moveEvent.clientY - e.clientY);
+                    
+                    // If significant movement and input not focused, start drag
+                    if ((deltaX > 10 || deltaY > 10) && document.activeElement !== input) {
+                        clearInputDrag();
+                        startDragFromInput(e);
+                    }
+                };
+
+                const startDragFromInput = (originalEvent) => {
+                    console.log('🎯 Starting drag from input field');
+                    input.blur(); // Remove focus from input
+                    startX = originalEvent.clientX;
+                    startY = originalEvent.clientY;
+                    const rect = element.getBoundingClientRect();
+                    initialX = rect.left;
+                    initialY = rect.top;
+                    isDragging = true;
+                    dragStarted = true;
+                    element.style.cursor = 'grabbing';
+                    document.addEventListener('mousemove', onMouseMove);
+                    document.addEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', trackInputMovement);
+                document.addEventListener('mouseup', clearInputDrag);
+                
+                // Allow normal input interaction
+                setTimeout(() => {
+                    if (!inputDragStarted && !isDragging) {
+                        input.focus();
+                        console.log('🎯 Input focused for typing');
+                    }
+                }, 50);
+                
+                return; // Exit early for input clicks
+            }
+
+            // NORMAL DRAG HANDLING FOR NON-INPUT AREAS
             // Clear any existing timeout
             if (dragTimeout) {
                 clearTimeout(dragTimeout);
@@ -694,14 +767,7 @@
 
             dragStarted = false;
 
-            // Check if we're clicking on the input field
-            const input = element.querySelector('#eva-search-input');
-            const isInputClick = input && (e.target === input || input.contains(e.target));
-
-            // Much shorter delay for input field - only 100ms
-            const delay = isInputClick ? 100 : 50;
-
-            // Set a very short delay before starting drag
+            // Very short delay for non-input areas
             dragTimeout = setTimeout(() => {
                 if (!dragStarted) {
                     isDragging = true;
@@ -710,19 +776,19 @@
                     document.addEventListener('mouseup', onMouseUp);
                     console.log('🎯 Drag started after short delay');
                 }
-            }, delay);
+            }, 50);
 
-            // Always prevent default to avoid text selection issues
+            // Prevent default only for non-input areas
             e.preventDefault();
         };
 
         const onMouseMove = (e) => {
             if (!isDragging) {
-                // Very low threshold for immediate drag start - just 3px
+                // Very low threshold for immediate drag start - just 5px for non-input
                 const deltaX = Math.abs(e.clientX - startX);
                 const deltaY = Math.abs(e.clientY - startY);
 
-                if (deltaX > 3 || deltaY > 3) {
+                if (deltaX > 5 || deltaY > 5) {
                     // Clear timeout and start dragging immediately
                     if (dragTimeout) {
                         clearTimeout(dragTimeout);
@@ -735,7 +801,7 @@
                     document.addEventListener('mouseup', onMouseUp);
                     console.log('🎯 Drag started by movement (optimized)');
 
-                    // Blur input if we're dragging from it
+                    // Blur input if we're dragging
                     const input = element.querySelector('#eva-search-input');
                     if (input && input === document.activeElement) {
                         input.blur();
@@ -774,12 +840,6 @@
             if (!isDragging && !dragStarted) {
                 // This was just a click, not a drag
                 console.log('🎯 Click detected (no drag) - optimized');
-
-                // For input clicks, focus the input
-                const input = element.querySelector('#eva-search-input');
-                if (input && (e.target === input || input.contains(e.target))) {
-                    setTimeout(() => input.focus(), 10);
-                }
                 return;
             }
 
@@ -934,7 +994,7 @@
                 : 'Eva Widget will now appear on all sites. Refresh pages to apply changes.';
             
             setTimeout(() => {
-                alert(message);
+            alert(message);
             }, 100);
             
             console.log('🎯 Domain restriction toggled to:', currentDomainRestriction ? 'Boost Only' : 'All Sites');
@@ -1303,8 +1363,13 @@
             console.log('🎯 🚀 SINGLE SEARCH HANDLER:', fileMode ? 'FILE MODE' : 'REGULAR MODE', 'Query:', query);
 
             const success = performSearch(query, fileMode);
-            if (success) {
+            
+            // FIXED: Only clear input for regular mode, keep text for file attachment mode
+            if (success && !fileMode) {
                 input.value = '';
+                console.log('🎯 Input cleared for regular mode');
+            } else if (success && fileMode) {
+                console.log('🎯 Input text preserved for file attachment mode');
             }
 
             setTimeout(() => {
@@ -1525,7 +1590,7 @@
     };
 
     // START THE WIDGET
-    console.log('🎯 Starting Eva Widget - Theme-Aware Settings Menu with Boost Domain Option');
+    console.log('🎯 Starting Eva Widget - Fixed Input Interaction and File Attachment Mode');
 
     if (document.readyState !== 'loading') {
         console.log('🎯 Document ready, initializing immediately');
@@ -1543,6 +1608,6 @@
         }
     }, 100);
 
-    console.log('🎯 Eva Widget script loaded - Theme-Aware Settings Menu with Boost Domain Option');
+    console.log('🎯 Eva Widget script loaded - Fixed Input Interaction and File Attachment Mode');
 
 })();
